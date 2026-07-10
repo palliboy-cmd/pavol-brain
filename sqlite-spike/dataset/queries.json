@@ -1,0 +1,338 @@
+[
+  {
+    "id": "Q01",
+    "query": "synthetic topic 001",
+    "scope": [
+      "ai-pos"
+    ],
+    "expected_top": [
+      "rec-001"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q02",
+    "query": "synthetic topic 002",
+    "scope": [
+      "ai-pos-app"
+    ],
+    "expected_top": [
+      "rec-002"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q03",
+    "query": "synthetic topic 003",
+    "scope": [
+      "smart-timesheet"
+    ],
+    "expected_top": [
+      "rec-003"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q04",
+    "query": "synthetic topic 004",
+    "scope": [
+      "abap-object-exporter"
+    ],
+    "expected_top": [
+      "rec-004"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q05",
+    "query": "synthetic topic 005",
+    "scope": [
+      "personal"
+    ],
+    "expected_top": [
+      "rec-005"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q06",
+    "query": "synthetic topic 006",
+    "scope": [
+      "ai-pos"
+    ],
+    "expected_top": [
+      "rec-006"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q07",
+    "query": "synthetic topic 007",
+    "scope": [
+      "ai-pos-app"
+    ],
+    "expected_top": [
+      "rec-007"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q08",
+    "query": "synthetic topic 008",
+    "scope": [
+      "smart-timesheet"
+    ],
+    "expected_top": [
+      "rec-008"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q09",
+    "query": "synthetic topic 009",
+    "scope": [
+      "abap-object-exporter"
+    ],
+    "expected_top": [
+      "rec-009"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q10",
+    "query": "synthetic topic 010",
+    "scope": [
+      "personal"
+    ],
+    "expected_top": [
+      "rec-010"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q11",
+    "query": "synthetic topic 011",
+    "scope": [
+      "ai-pos"
+    ],
+    "expected_top": [
+      "rec-011"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q12",
+    "query": "synthetic topic 012",
+    "scope": [
+      "ai-pos-app"
+    ],
+    "expected_top": [
+      "rec-012"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q13",
+    "query": "synthetic topic 013",
+    "scope": [
+      "smart-timesheet"
+    ],
+    "expected_top": [
+      "rec-013"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q14",
+    "query": "synthetic topic 014",
+    "scope": [
+      "abap-object-exporter"
+    ],
+    "expected_top": [
+      "rec-014"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q15",
+    "query": "synthetic topic 015",
+    "scope": [
+      "personal"
+    ],
+    "expected_top": [
+      "rec-015"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q16",
+    "query": "synthetic topic 016",
+    "scope": [
+      "ai-pos"
+    ],
+    "expected_top": [
+      "rec-016"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q17",
+    "query": "synthetic topic 017",
+    "scope": [
+      "ai-pos-app"
+    ],
+    "expected_top": [
+      "rec-017"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q18",
+    "query": "synthetic topic 018",
+    "scope": [
+      "smart-timesheet"
+    ],
+    "expected_top": [
+      "rec-018"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q19",
+    "query": "synthetic topic 019",
+    "scope": [
+      "abap-object-exporter"
+    ],
+    "expected_top": [
+      "rec-019"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q20",
+    "query": "synthetic topic 020",
+    "scope": [
+      "personal"
+    ],
+    "expected_top": [
+      "rec-020"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q21",
+    "query": "synthetic topic 021",
+    "scope": [
+      "ai-pos"
+    ],
+    "expected_top": [
+      "rec-021"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q22",
+    "query": "synthetic topic 022",
+    "scope": [
+      "ai-pos-app"
+    ],
+    "expected_top": [
+      "rec-022"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q23",
+    "query": "synthetic topic 023",
+    "scope": [
+      "smart-timesheet"
+    ],
+    "expected_top": [
+      "rec-023"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  },
+  {
+    "id": "Q24",
+    "query": "synthetic topic 024",
+    "scope": [
+      "abap-object-exporter"
+    ],
+    "expected_top": [
+      "rec-024"
+    ],
+    "failure_condition": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "tags": [
+      "requires-semantic-review"
+    ]
+  }
+]

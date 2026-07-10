@@ -1,0 +1,674 @@
+[
+  {
+    "query_id": "Q01",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-001"
+  },
+  {
+    "query_id": "Q01",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-001"
+  },
+  {
+    "query_id": "Q02",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "ai-pos-app"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-002"
+  },
+  {
+    "query_id": "Q02",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-002"
+  },
+  {
+    "query_id": "Q02",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-002"
+  },
+  {
+    "query_id": "Q03",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "smart-timesheet"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-003"
+  },
+  {
+    "query_id": "Q03",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-003"
+  },
+  {
+    "query_id": "Q03",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-003"
+  },
+  {
+    "query_id": "Q04",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "abap-object-exporter"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-004"
+  },
+  {
+    "query_id": "Q04",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-004"
+  },
+  {
+    "query_id": "Q04",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-004"
+  },
+  {
+    "query_id": "Q05",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "personal"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-005"
+  },
+  {
+    "query_id": "Q05",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-005"
+  },
+  {
+    "query_id": "Q05",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-005"
+  },
+  {
+    "query_id": "Q06",
+    "field": "scope",
+    "old_value": [
+      "sap-work"
+    ],
+    "new_value": [
+      "ai-pos"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-006"
+  },
+  {
+    "query_id": "Q06",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-006"
+  },
+  {
+    "query_id": "Q06",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-006"
+  },
+  {
+    "query_id": "Q07",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "ai-pos-app"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-007"
+  },
+  {
+    "query_id": "Q07",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-007"
+  },
+  {
+    "query_id": "Q07",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-007"
+  },
+  {
+    "query_id": "Q08",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "smart-timesheet"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-008"
+  },
+  {
+    "query_id": "Q08",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-008"
+  },
+  {
+    "query_id": "Q08",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-008"
+  },
+  {
+    "query_id": "Q09",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "abap-object-exporter"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-009"
+  },
+  {
+    "query_id": "Q09",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-009"
+  },
+  {
+    "query_id": "Q09",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-009"
+  },
+  {
+    "query_id": "Q10",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "personal"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-010"
+  },
+  {
+    "query_id": "Q10",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-010"
+  },
+  {
+    "query_id": "Q10",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-010"
+  },
+  {
+    "query_id": "Q11",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-011"
+  },
+  {
+    "query_id": "Q11",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-011"
+  },
+  {
+    "query_id": "Q12",
+    "field": "scope",
+    "old_value": [
+      "sap-work"
+    ],
+    "new_value": [
+      "ai-pos-app"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-012"
+  },
+  {
+    "query_id": "Q12",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-012"
+  },
+  {
+    "query_id": "Q12",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-012"
+  },
+  {
+    "query_id": "Q13",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "smart-timesheet"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-013"
+  },
+  {
+    "query_id": "Q13",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-013"
+  },
+  {
+    "query_id": "Q13",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-013"
+  },
+  {
+    "query_id": "Q14",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "abap-object-exporter"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-014"
+  },
+  {
+    "query_id": "Q14",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-014"
+  },
+  {
+    "query_id": "Q14",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-014"
+  },
+  {
+    "query_id": "Q15",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "personal"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-015"
+  },
+  {
+    "query_id": "Q15",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-015"
+  },
+  {
+    "query_id": "Q15",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-015"
+  },
+  {
+    "query_id": "Q16",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-016"
+  },
+  {
+    "query_id": "Q16",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-016"
+  },
+  {
+    "query_id": "Q17",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "ai-pos-app"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-017"
+  },
+  {
+    "query_id": "Q17",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-017"
+  },
+  {
+    "query_id": "Q17",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-017"
+  },
+  {
+    "query_id": "Q18",
+    "field": "scope",
+    "old_value": [
+      "sap-work"
+    ],
+    "new_value": [
+      "smart-timesheet"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-018"
+  },
+  {
+    "query_id": "Q18",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-018"
+  },
+  {
+    "query_id": "Q18",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-018"
+  },
+  {
+    "query_id": "Q19",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "abap-object-exporter"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-019"
+  },
+  {
+    "query_id": "Q19",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-019"
+  },
+  {
+    "query_id": "Q19",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-019"
+  },
+  {
+    "query_id": "Q20",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "personal"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-020"
+  },
+  {
+    "query_id": "Q20",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-020"
+  },
+  {
+    "query_id": "Q20",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-020"
+  },
+  {
+    "query_id": "Q21",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-021"
+  },
+  {
+    "query_id": "Q21",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-021"
+  },
+  {
+    "query_id": "Q22",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "ai-pos-app"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-022"
+  },
+  {
+    "query_id": "Q22",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-022"
+  },
+  {
+    "query_id": "Q22",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-022"
+  },
+  {
+    "query_id": "Q23",
+    "field": "scope",
+    "old_value": [
+      "ai-pos"
+    ],
+    "new_value": [
+      "smart-timesheet"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-023"
+  },
+  {
+    "query_id": "Q23",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-023"
+  },
+  {
+    "query_id": "Q23",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-023"
+  },
+  {
+    "query_id": "Q24",
+    "field": "scope",
+    "old_value": [
+      "sap-work"
+    ],
+    "new_value": [
+      "abap-object-exporter"
+    ],
+    "reason": "expected record must be inside explicit retrieval scope",
+    "evidence_record_id": "rec-024"
+  },
+  {
+    "query_id": "Q24",
+    "field": "tags",
+    "old_value": null,
+    "new_value": [
+      "requires-semantic-review"
+    ],
+    "reason": "placeholder query text has no semantic evidence for scope or expected result",
+    "evidence_record_id": "rec-024"
+  },
+  {
+    "query_id": "Q24",
+    "field": "failure_condition",
+    "old_value": "unexpected workspace or candidate",
+    "new_value": "semantic benchmark definition incomplete; exclude from scoring until query text, intended scope, and expected record are curated",
+    "reason": "prevent a structurally corrected placeholder from being scored as a semantic benchmark",
+    "evidence_record_id": "rec-024"
+  }
+]
