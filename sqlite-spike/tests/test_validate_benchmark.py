@@ -26,6 +26,9 @@ class BenchmarkValidatorTests(unittest.TestCase):
     def test_ineligible_status(self): self.assertIn("ineligible_record", self.categories([query()], {"rec-001": record(status="candidate", projection=False)}))
     def test_type_mismatch(self): self.assertIn("type_mismatch", self.categories([query(filters={"mode": "current", "types": ["decision"]})], {"rec-001": record()}))
     def test_sensitive_leak(self): self.assertIn("sensitive_leak", self.categories([query()], {"rec-001": record(sensitivity="sensitive")}))
+    def test_historical_mode_does_not_invent_an_as_of_snapshot(self):
+        q = query(filters={"mode": "historical", "types": ["fact"], "sensitive_allowed": False})
+        self.assertNotIn("inconsistent_time_filter", self.categories([q], {"rec-001": record(status="superseded")}))
     def test_duplicate_query_id(self): self.assertIn("duplicate_query_id", self.categories([query(), query()], {"rec-001": record()}))
     def test_exact_preservation_of_24_ids(self):
         records = {f"rec-{i:03d}": record(f"rec-{i:03d}") for i in range(24)}

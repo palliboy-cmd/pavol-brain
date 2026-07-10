@@ -76,13 +76,14 @@ def validate_manifest(queries, records):
                 issues.append(issue("type_mismatch", query_id, "types filter excludes expected record", record_id))
             if record["sensitivity"] == "sensitive" and not filters.get("sensitive_allowed", False):
                 issues.append(issue("sensitive_leak", query_id, "sensitive record lacks explicit sensitive_allowed", record_id))
-            if mode in {"historical", "as_of"}:
+            if mode == "as_of" or filters.get("as_of"):
                 as_of = filters.get("as_of")
                 if not as_of:
-                    issues.append(issue("inconsistent_time_filter", query_id, "historical/as_of mode requires as_of", record_id))
+                    issues.append(issue("inconsistent_time_filter", query_id, "as_of mode requires as_of", record_id))
                 else:
                     try:
-                        if datetime.fromisoformat(as_of) < datetime.fromisoformat(record["valid_at"]):
+                        valid_at = record.get("valid_at")
+                        if valid_at and datetime.fromisoformat(as_of) < datetime.fromisoformat(valid_at):
                             issues.append(issue("inconsistent_time_filter", query_id, "as_of predates expected record", record_id))
                     except ValueError:
                         issues.append(issue("inconsistent_time_filter", query_id, "as_of is not ISO-8601", record_id))
