@@ -1,0 +1,1614 @@
+{
+  "route": "fts5_only",
+  "build": {
+    "documents": 51,
+    "db": "/Users/pavol/Documents/Personal/Projects/pavol-brain/sqlite-spike/retrieval.db"
+  },
+  "queries": [
+    {
+      "query_id": "Q01",
+      "query": "Kde návrh oddeľuje audit od samotného vykonania dotazu?",
+      "scope": [
+        "ai-pos"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-001"
+      ],
+      "allowed_alternatives": [
+        "rec-011",
+        "rec-021"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-041",
+          "rank": 1,
+          "bm25_score": -2.168175192451043,
+          "workspace": "ai-pos",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:40+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "5489067b7445c355253dfcf377f4de1ec755b21412e2ea22a18f0c48f4ed1e02",
+            "record_id": "rec-041"
+          }
+        },
+        {
+          "record_id": "rec-021",
+          "rank": 2,
+          "bm25_score": -2.168175192451043,
+          "workspace": "ai-pos",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:20+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "b53950d7795c85480d36b7c70703ae5230a60d2abafbff91893587faf98da932",
+            "record_id": "rec-021"
+          }
+        },
+        {
+          "record_id": "rec-001",
+          "rank": 3,
+          "bm25_score": -2.168175192451043,
+          "workspace": "ai-pos",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:00+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "80f3a6fa2417c05bfc1881e830dad8edaabce3777699fe02b49e86759186f428",
+            "record_id": "rec-001"
+          }
+        }
+      ],
+      "top1_pass": false,
+      "top3_pass": true,
+      "failure_condition": "expected decision absent from top-3, any out-of-scope result, or an ineligible status",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.2168749924749136,
+      "tags": [
+        "lexical_exact",
+        "current_truth"
+      ]
+    },
+    {
+      "query_id": "Q02",
+      "query": "Čo má zostať autoritatívnym záznamom výsledku, keď sa mení vyhľadávacia vrstva?",
+      "scope": [
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "outcome"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-002"
+      ],
+      "allowed_alternatives": [
+        "rec-022",
+        "rec-042"
+      ],
+      "returned": [],
+      "top1_pass": false,
+      "top3_pass": false,
+      "failure_condition": "no canonical-journal outcome in top-3 or any result outside ai-pos-app",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.026708992663770914,
+      "tags": [
+        "semantic_paraphrase",
+        "current_truth"
+      ]
+    },
+    {
+      "query_id": "Q03",
+      "query": "Na akom stroji je nasadený Compose pre timesheetové prostredie?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-003"
+      ],
+      "allowed_alternatives": [
+        "rec-023",
+        "rec-043"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-043",
+          "rank": 1,
+          "bm25_score": -2.168175192451043,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:42+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "0933f1f415a520619e490da42276f00d4223c3b121e1aba3840a8410d39e57ca",
+            "record_id": "rec-043"
+          }
+        },
+        {
+          "record_id": "rec-023",
+          "rank": 2,
+          "bm25_score": -2.168175192451043,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:22+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "636dbc7cea527b48fe29f803bb9b3042aa0ba430c7d9caf54bec4c7004b5e7f3",
+            "record_id": "rec-023"
+          }
+        },
+        {
+          "record_id": "rec-003",
+          "rank": 3,
+          "bm25_score": -2.168175192451043,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:02+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "62b824560cb80bbe449e14e02fa47bf1508b69464a8b9898f7095be07e9b0ce9",
+            "record_id": "rec-003"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "mini-core fact absent from top-3 or a result outside smart-timesheet",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.037582998629659414,
+      "tags": [
+        "multilingual",
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q04",
+      "query": "Nájdi deterministický link z ABAP exportu na spoločný README súbor.",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-004"
+      ],
+      "allowed_alternatives": [
+        "rec-044"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-044",
+          "rank": 1,
+          "bm25_score": -1.3508400746750528,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:43+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-044"
+          }
+        },
+        {
+          "record_id": "rec-024",
+          "rank": 2,
+          "bm25_score": -1.3508400746750528,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:23+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-024"
+          }
+        },
+        {
+          "record_id": "rec-004",
+          "rank": 3,
+          "bm25_score": -1.3508400746750528,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:03+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-004"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "README artifact link absent from top-3, invalid artifact returned, or workspace leak",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.039457983803004026,
+      "tags": [
+        "artifact_path_lookup",
+        "lexical_exact"
+      ]
+    },
+    {
+      "query_id": "Q05",
+      "query": "Ako má architektúra chápať Graphiti po odstránení odvodeného indexu?",
+      "scope": [
+        "personal"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-005"
+      ],
+      "allowed_alternatives": [],
+      "returned": [
+        {
+          "record_id": "rec-025",
+          "rank": 1,
+          "bm25_score": -2.034524900607118,
+          "workspace": "personal",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:24+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "e216e9a511ccdd3c123f89270cc89194b91aadd36dd21fd0711c6097d714f425",
+            "record_id": "rec-025"
+          }
+        },
+        {
+          "record_id": "rec-005",
+          "rank": 2,
+          "bm25_score": -2.034524900607118,
+          "workspace": "personal",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:04+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "7dbfff834ae5f76d156f67385985903455fb74de8f2d7e50682b611aba017695",
+            "record_id": "rec-005"
+          }
+        }
+      ],
+      "top1_pass": false,
+      "top3_pass": true,
+      "failure_condition": "current decision absent from top-3 or superseded rec-045 returned as current truth",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.031916017178446054,
+      "tags": [
+        "current_truth",
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q06",
+      "query": "Čo ešte treba overiť pred tým, než sú release notes pripravené?",
+      "scope": [
+        "ai-pos"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "outcome"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-006"
+      ],
+      "allowed_alternatives": [
+        "rec-026",
+        "rec-046"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-046",
+          "rank": 1,
+          "bm25_score": -5.497027443785344,
+          "workspace": "ai-pos",
+          "type": "outcome",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:45+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "a889b53bb26801648126a03e37dd688131f1f106ea763f703bfb077836edc568",
+            "record_id": "rec-046"
+          }
+        },
+        {
+          "record_id": "rec-026",
+          "rank": 2,
+          "bm25_score": -5.497027443785344,
+          "workspace": "ai-pos",
+          "type": "outcome",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:25+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "1b2dfdf03fc6bb41364343cecbf7c328c62ec0a473398fab0c62b1a704cd7cd6",
+            "record_id": "rec-026"
+          }
+        },
+        {
+          "record_id": "rec-006",
+          "rank": 3,
+          "bm25_score": -5.497027443785344,
+          "workspace": "ai-pos",
+          "type": "outcome",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:05+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "27d25eae5740756e5346a70108b9f50cdf6d45e0edac45feec6280dacd46f2c8",
+            "record_id": "rec-006"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "validation outcome absent from top-3 or non-ai-pos result returned",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.03629201091825962,
+      "tags": [
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q07",
+      "query": "Je izolácia wrkspacov povinná?",
+      "scope": [
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-007"
+      ],
+      "allowed_alternatives": [
+        "rec-027"
+      ],
+      "returned": [],
+      "top1_pass": false,
+      "top3_pass": false,
+      "failure_condition": "workspace-isolation fact absent from top-3 or workspace leak",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.012165983207523823,
+      "tags": [
+        "typo_noisy",
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q08",
+      "query": "Ktorý evidovaný link v timesheete ukazuje na spoločnú projektovú dokumentáciu?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-008"
+      ],
+      "allowed_alternatives": [
+        "rec-028"
+      ],
+      "returned": [],
+      "top1_pass": false,
+      "top3_pass": false,
+      "failure_condition": "shared README link absent from top-3, invalid artifact returned, or workspace leak",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.01950003206729889,
+      "tags": [
+        "artifact_path_lookup",
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q09",
+      "query": "Aké pravidlo platí pre prácu so zdrojovou štruktúrou ABAP exportéra?",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-009"
+      ],
+      "allowed_alternatives": [],
+      "returned": [],
+      "top1_pass": false,
+      "top3_pass": false,
+      "failure_condition": "read-only decision absent from top-3 or candidate/rejected record returned",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.017707992810755968,
+      "tags": [
+        "semantic_paraphrase",
+        "current_truth"
+      ]
+    },
+    {
+      "query_id": "Q10",
+      "query": "Aké staršie rozhodnutie o Graphiti patrí do histórie, nie medzi platné odporúčania?",
+      "scope": [
+        "personal"
+      ],
+      "filters": {
+        "mode": "historical",
+        "types": [
+          "decision"
+        ],
+        "include_superseded": true,
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-045"
+      ],
+      "allowed_alternatives": [],
+      "returned": [
+        {
+          "record_id": "rec-045",
+          "rank": 1,
+          "bm25_score": -2.034524900607118,
+          "workspace": "personal",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "superseded",
+          "valid_at": "2026-07-10T00:00:44+00:00",
+          "invalid_at": "2026-07-10T00:00:00+00:00",
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "562f1bb368b7c19cd798789a4da08fe3fa88f3eb5a3ca59f828f7f43fe683a64",
+            "record_id": "rec-045"
+          }
+        },
+        {
+          "record_id": "rec-025",
+          "rank": 2,
+          "bm25_score": -2.034524900607118,
+          "workspace": "personal",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:24+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "e216e9a511ccdd3c123f89270cc89194b91aadd36dd21fd0711c6097d714f425",
+            "record_id": "rec-025"
+          }
+        },
+        {
+          "record_id": "rec-005",
+          "rank": 3,
+          "bm25_score": -2.034524900607118,
+          "workspace": "personal",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:04+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "7dbfff834ae5f76d156f67385985903455fb74de8f2d7e50682b611aba017695",
+            "record_id": "rec-005"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "superseded decision absent, returned without superseded status, or exposed by a current-mode query",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.06045796908438206,
+      "tags": [
+        "historical",
+        "supersede"
+      ]
+    },
+    {
+      "query_id": "Q11",
+      "query": "Ktorá zásada stanovuje hranicu medzi auditom a retrievalom?",
+      "scope": [
+        "ai-pos"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-011"
+      ],
+      "allowed_alternatives": [
+        "rec-031",
+        "rec-041"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-031",
+          "rank": 1,
+          "bm25_score": -2.168175192451043,
+          "workspace": "ai-pos",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:30+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "086dbc5784e4913c812c0a0a7f0835e2794924ad42057441d08b68f8d59a8f9c",
+            "record_id": "rec-031"
+          }
+        },
+        {
+          "record_id": "rec-011",
+          "rank": 2,
+          "bm25_score": -2.168175192451043,
+          "workspace": "ai-pos",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:10+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "415298a1f6d5015ec1277ff58241957c0cd0272a81085ff14f9e71023764ffa7",
+            "record_id": "rec-011"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "query-boundary fact absent from top-3 or wrong record type returned",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.028125010430812836,
+      "tags": [
+        "lexical_exact",
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q12",
+      "query": "V aplikácii ai-pos nájdi uloženú väzbu na README spoločného repozitára.",
+      "scope": [
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-012"
+      ],
+      "allowed_alternatives": [
+        "rec-032",
+        "rec-052"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-052",
+          "rank": 1,
+          "bm25_score": -4.052520224025159,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:51+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-052"
+          }
+        },
+        {
+          "record_id": "rec-032",
+          "rank": 2,
+          "bm25_score": -4.052520224025159,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:31+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-032"
+          }
+        },
+        {
+          "record_id": "rec-012",
+          "rank": 3,
+          "bm25_score": -4.052520224025159,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:11+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-012"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "artifact link absent from top-3, invalid artifact returned, or workspace leak",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.038457976188510656,
+      "tags": [
+        "artifact_path_lookup",
+        "lexical_exact"
+      ]
+    },
+    {
+      "query_id": "Q13",
+      "query": "Čo hovorí rozhodnutie Smart Timesheetu o spúšťaní Docker Compose?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-013"
+      ],
+      "allowed_alternatives": [
+        "rec-033"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-033",
+          "rank": 1,
+          "bm25_score": -4.336350384902086,
+          "workspace": "smart-timesheet",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:32+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "22847b69b069e642464fd8fa36e34dbcff11ab4b5afd7d1f9cd144b17007ce3d",
+            "record_id": "rec-033"
+          }
+        },
+        {
+          "record_id": "rec-013",
+          "rank": 2,
+          "bm25_score": -4.336350384902086,
+          "workspace": "smart-timesheet",
+          "type": "decision",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:12+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "6645a88dcc59dbea9a45f4805b9a326a69ff008b194a56f7ba741a9f109b11f8",
+            "record_id": "rec-013"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "Compose decision absent from top-3 or result outside smart-timesheet",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.041583029087632895,
+      "tags": [
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q14",
+      "query": "Aký výsledok potvrdzuje, že ABAP export zachováva pôvodné usporiadanie zdrojov?",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "outcome"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-014"
+      ],
+      "allowed_alternatives": [
+        "rec-034"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-034",
+          "rank": 1,
+          "bm25_score": -3.0324957659919614,
+          "workspace": "abap-object-exporter",
+          "type": "outcome",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:33+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "8e263e397e1fdc5cfff54a56e8819bc87b8096c38423c04b9302f82cf7fc3417",
+            "record_id": "rec-034"
+          }
+        },
+        {
+          "record_id": "rec-014",
+          "rank": 2,
+          "bm25_score": -3.0324957659919614,
+          "workspace": "abap-object-exporter",
+          "type": "outcome",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:13+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "10ecf2c30505d038644cb069ac8f4a5460b90928805974d17a5e0693f7fdf96c",
+            "record_id": "rec-014"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "source-structure outcome absent from top-3 or wrong workspace result",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.03895896952599287,
+      "tags": [
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q15",
+      "query": "Čo v tomto návrhu znamená, že Graphiti je vymazateľný index?",
+      "scope": [
+        "personal"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-015"
+      ],
+      "allowed_alternatives": [
+        "rec-035"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-035",
+          "rank": 1,
+          "bm25_score": -4.069049801214236,
+          "workspace": "personal",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:34+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "51ae0c1c1c4e394ca6c0180923b6a0706d3dd1b8c8c7bbbabccc523ae374cbff",
+            "record_id": "rec-035"
+          }
+        },
+        {
+          "record_id": "rec-015",
+          "rank": 2,
+          "bm25_score": -4.069049801214236,
+          "workspace": "personal",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:14+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "dc266b3e239b1beefb34362468eb14d16ab3d7aed72c0514869fd65c4b487f57",
+            "record_id": "rec-015"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "erased-index fact absent from top-3 or superseded record presented as current",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.03812497016042471,
+      "tags": [
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q16",
+      "query": "Kde je vzťah k README označený ako deterministický a typu touches?",
+      "scope": [
+        "ai-pos"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-016"
+      ],
+      "allowed_alternatives": [
+        "rec-036"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-036",
+          "rank": 1,
+          "bm25_score": -2.306113623127413,
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:35+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-036"
+          }
+        },
+        {
+          "record_id": "rec-016",
+          "rank": 2,
+          "bm25_score": -2.306113623127413,
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:15+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-016"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "deterministic artifact relation absent from top-3 or invalid artifact returned",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.03504200140014291,
+      "tags": [
+        "artifact_path_lookup",
+        "lexical_exact"
+      ]
+    },
+    {
+      "query_id": "Q17",
+      "query": "Prečo musí aplikácia pamäti oddeľovať jednotlivé pracovné priestory?",
+      "scope": [
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-017"
+      ],
+      "allowed_alternatives": [
+        "rec-037"
+      ],
+      "returned": [],
+      "top1_pass": false,
+      "top3_pass": false,
+      "failure_condition": "workspace-isolation decision absent from top-3 or any out-of-scope result",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.024833017960190773,
+      "tags": [
+        "semantic_paraphrase",
+        "workspace_isolation"
+      ]
+    },
+    {
+      "query_id": "Q18",
+      "query": "Welches Speicherverfahren erlaubt Journal-Schreibvorgänge ohne blockierende Leser?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "outcome"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-018"
+      ],
+      "allowed_alternatives": [
+        "rec-038"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-038",
+          "rank": 1,
+          "bm25_score": -2.168175192451043,
+          "workspace": "smart-timesheet",
+          "type": "outcome",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:37+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "6affb4fbd63b0d3c016954f2227fd8528bdc54a22b23d9b2c4b3e6f546f85474",
+            "record_id": "rec-038"
+          }
+        },
+        {
+          "record_id": "rec-018",
+          "rank": 2,
+          "bm25_score": -2.168175192451043,
+          "workspace": "smart-timesheet",
+          "type": "outcome",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:17+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "0f52a82a9bccc3a5db2d4163fe4b57c9f5f2e0abb9db78b384ba31a48a7fb2b0",
+            "record_id": "rec-018"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "SQLite WAL outcome absent from top-3 or non-timesheet result returned",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.031167000997811556,
+      "tags": [
+        "multilingual",
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q19",
+      "query": "Aké obmedzenie platí pre cesty k artefaktom ABAP exportéra?",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-019"
+      ],
+      "allowed_alternatives": [
+        "rec-039"
+      ],
+      "returned": [],
+      "top1_pass": false,
+      "top3_pass": false,
+      "failure_condition": "artifact-path fact absent from top-3 or result outside abap-object-exporter",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.015958037693053484,
+      "tags": [
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q20",
+      "query": "Ktorý osobný záznam prepája evidovaný výsledok s README z projektu ai-pos?",
+      "scope": [
+        "personal"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-020"
+      ],
+      "allowed_alternatives": [
+        "rec-040"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-040",
+          "rank": 1,
+          "bm25_score": -4.052520224025159,
+          "workspace": "personal",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:39+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-040"
+          }
+        },
+        {
+          "record_id": "rec-020",
+          "rank": 2,
+          "bm25_score": -4.052520224025159,
+          "workspace": "personal",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:19+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-020"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "personal README artifact link absent from top-3 or workspace leak",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.035208999179303646,
+      "tags": [
+        "artifact_path_lookup",
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q21",
+      "query": "Ktoré rozhodnutie v ai-pos zavádza query boundary a kde v ai-pos-app nájdem jeho README väzbu?",
+      "scope": [
+        "ai-pos",
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision",
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-021",
+        "rec-012"
+      ],
+      "allowed_alternatives": [
+        "rec-001",
+        "rec-016",
+        "rec-032",
+        "rec-052"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-052",
+          "rank": 1,
+          "bm25_score": -6.754200373375264,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:51+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-052"
+          }
+        },
+        {
+          "record_id": "rec-036",
+          "rank": 2,
+          "bm25_score": -6.754200373375264,
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:35+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-036"
+          }
+        },
+        {
+          "record_id": "rec-032",
+          "rank": 3,
+          "bm25_score": -6.754200373375264,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:31+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-032"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": false,
+      "failure_condition": "either required workspace contribution absent from top-3, any third-workspace result, or ineligible status",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.08116697426885366,
+      "tags": [
+        "cross_workspace",
+        "artifact_path_lookup",
+        "current_truth"
+      ]
+    },
+    {
+      "query_id": "Q22",
+      "query": "Aké rozhodnutie platí pre lokálny model v citlivom pracovnom priestore?",
+      "scope": [
+        "sap-work"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": true
+      },
+      "expected_top": [
+        "rec-053"
+      ],
+      "allowed_alternatives": [],
+      "returned": [
+        {
+          "record_id": "rec-053",
+          "rank": 1,
+          "bm25_score": -6.579572504636197,
+          "workspace": "sap-work",
+          "type": "decision",
+          "sensitivity": "sensitive",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:52+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "2a5be26201fe69976cecaa54d170c0b41658c8c7c7dbd0660b9ce92b42e9e40d",
+            "record_id": "rec-053"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "sensitive decision absent from top-3, sensitive_allowed ignored, or any result outside sap-work",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.02941704588010907,
+      "tags": [
+        "sensitive_explicit",
+        "semantic_paraphrase"
+      ]
+    },
+    {
+      "query_id": "Q23",
+      "query": "Wo wird Docker Compose für die Zeiterfassung betrieben?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-023"
+      ],
+      "allowed_alternatives": [
+        "rec-003",
+        "rec-043"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-043",
+          "rank": 1,
+          "bm25_score": -4.336350384902086,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:42+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "0933f1f415a520619e490da42276f00d4223c3b121e1aba3840a8410d39e57ca",
+            "record_id": "rec-043"
+          }
+        },
+        {
+          "record_id": "rec-023",
+          "rank": 2,
+          "bm25_score": -4.336350384902086,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:22+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "636dbc7cea527b48fe29f803bb9b3042aa0ba430c7d9caf54bec4c7004b5e7f3",
+            "record_id": "rec-023"
+          }
+        },
+        {
+          "record_id": "rec-003",
+          "rank": 3,
+          "bm25_score": -4.336350384902086,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:02+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "62b824560cb80bbe449e14e02fa47bf1508b69464a8b9898f7095be07e9b0ce9",
+            "record_id": "rec-003"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "mini-core fact absent from top-3 or workspace leak",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.029082992114126682,
+      "tags": [
+        "multilingual",
+        "lexical_exact"
+      ]
+    },
+    {
+      "query_id": "Q24",
+      "query": "Nájdi ABAP artifact link, ktorý ukazuje na README projektu ai-pos.",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "expected_top": [
+        "rec-024"
+      ],
+      "allowed_alternatives": [
+        "rec-004",
+        "rec-044"
+      ],
+      "returned": [
+        {
+          "record_id": "rec-044",
+          "rank": 1,
+          "bm25_score": -4.052520224025159,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:43+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-044"
+          }
+        },
+        {
+          "record_id": "rec-024",
+          "rank": 2,
+          "bm25_score": -4.052520224025159,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:23+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-024"
+          }
+        },
+        {
+          "record_id": "rec-004",
+          "rank": 3,
+          "bm25_score": -4.052520224025159,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "sensitivity": "normal",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:03+00:00",
+          "invalid_at": null,
+          "provenance": {
+            "route": "fts5",
+            "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+            "record_id": "rec-004"
+          }
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true,
+      "failure_condition": "ABAP README artifact link absent from top-3, invalid artifact returned, or workspace leak",
+      "failure_condition_pass": true,
+      "leaks": {
+        "workspace": 0,
+        "sensitive": 0,
+        "forbidden_status": 0
+      },
+      "latency_ms": 0.03666698466986418,
+      "tags": [
+        "artifact_path_lookup",
+        "lexical_exact"
+      ]
+    }
+  ],
+  "evaluation": {
+    "queries": 24,
+    "top1_rate": 0.6666666666666666,
+    "top3_rate": 0.7083333333333334,
+    "workspace_leaks": 0,
+    "sensitive_leaks": 0,
+    "forbidden_status_leaks": 0,
+    "latency_ms": {
+      "p50": 0.03504200140014291,
+      "p95": 0.06045796908438206
+    },
+    "not_evaluated": [
+      "embeddings",
+      "cosine",
+      "rrf",
+      "rebuild_equivalence",
+      "noise_rate_manual"
+    ],
+    "multilingual_top3_rate": 1.0,
+    "historical_top3_rate": 1.0,
+    "failed_queries": [
+      "Q02",
+      "Q07",
+      "Q08",
+      "Q09",
+      "Q17",
+      "Q19",
+      "Q21"
+    ],
+    "go_gates": {
+      "S1_top3": false,
+      "S2_top1": true,
+      "S3_multilingual": true,
+      "S5_workspace": true,
+      "S6_sensitive": true,
+      "S7_forbidden": true,
+      "S9_historical": true,
+      "S13_latency": true
+    }
+  }
+}
