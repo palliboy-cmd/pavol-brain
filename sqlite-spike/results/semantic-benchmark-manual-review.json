@@ -1,0 +1,41 @@
+{
+  "manifest": "sqlite-spike/dataset/queries.json",
+  "reviewed_at": "2026-07-10",
+  "score_ready": true,
+  "source_query_policy": "Every source_query preserves the immutable synthetic text from spike/dataset/queries.json; query is the curated retrieval prompt.",
+  "category_counts": {
+    "lexical_exact": 6,
+    "semantic_paraphrase": 11,
+    "multilingual": 3,
+    "typo_noisy": 1,
+    "historical": 1,
+    "cross_workspace": 1,
+    "sensitive_explicit": 1
+  },
+  "reviews": [
+    {"query_id":"Q01","primary_category":"lexical_exact","status":"pass","scope_review":"The query-boundary decision is owned by ai-pos.","expected_review":"rec-001 is the accepted decision formulation; repeated fact variants are declared alternatives.","test":"Exact retrieval of the audit/query-boundary decision."},
+    {"query_id":"Q02","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The canonical-journal outcome belongs to ai-pos-app.","expected_review":"rec-002 is the first accepted outcome with that meaning; repeated outcomes are alternatives.","test":"Semantic paraphrase of journal authority."},
+    {"query_id":"Q03","primary_category":"multilingual","status":"pass","scope_review":"The mini-core Compose fact is in smart-timesheet.","expected_review":"rec-003 is the accepted fact; equivalent repeated facts are alternatives.","test":"Slovak query against English record text."},
+    {"query_id":"Q04","primary_category":"lexical_exact","status":"pass","scope_review":"The artifact-link record is owned by abap-object-exporter.","expected_review":"rec-004 is a valid deterministic README link in that workspace.","test":"Artifact/path lookup with deterministic provenance."},
+    {"query_id":"Q05","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The current Graphiti conclusion belongs to personal.","expected_review":"rec-005 is accepted; rec-045 is explicitly superseded and excluded from current truth.","test":"Current-truth filtering after supersede."},
+    {"query_id":"Q06","primary_category":"semantic_paraphrase","status":"pass","scope_review":"Release-note validation is an ai-pos outcome.","expected_review":"rec-006 is the accepted matching outcome; repeated accepted variants are alternatives.","test":"Semantic outcome retrieval."},
+    {"query_id":"Q07","primary_category":"typo_noisy","status":"pass","scope_review":"The isolation fact belongs to ai-pos-app.","expected_review":"rec-007 is the accepted fact; rec-027 is its equivalent alternative.","test":"Typo-tolerant retrieval and workspace isolation."},
+    {"query_id":"Q08","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The timesheet artifact link is owned by smart-timesheet.","expected_review":"rec-008 is valid and points to the shared README; rec-028 is equivalent.","test":"Artifact context without an exact URI in the prompt."},
+    {"query_id":"Q09","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The source-structure decision belongs to abap-object-exporter.","expected_review":"rec-009 is the sole accepted decision; candidate rec-049 is deliberately not allowed.","test":"Decision retrieval plus candidate exclusion."},
+    {"query_id":"Q10","primary_category":"historical","status":"pass","scope_review":"The supersede chain is in personal.","expected_review":"rec-045 is the only superseded record and must be returned only in historical mode.","test":"Historical truth and superseded-state exposure; no fabricated as-of timestamp."},
+    {"query_id":"Q11","primary_category":"lexical_exact","status":"pass","scope_review":"The fact-shaped query-boundary statement is in ai-pos.","expected_review":"rec-011 is the matching accepted fact; later equivalent facts are alternatives.","test":"Type-filtered fact retrieval distinct from Q01's decision."},
+    {"query_id":"Q12","primary_category":"lexical_exact","status":"pass","scope_review":"The application-owned README link is in ai-pos-app.","expected_review":"rec-012 is a valid accepted artifact link; equivalent valid links are alternatives.","test":"Artifact URI lookup in the application scope."},
+    {"query_id":"Q13","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The Compose decision belongs to smart-timesheet.","expected_review":"rec-013 is the accepted decision and rec-033 is equivalent.","test":"Decision-level mini-core retrieval."},
+    {"query_id":"Q14","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The source-structure outcome belongs to abap-object-exporter.","expected_review":"rec-014 is accepted; rec-034 is an equivalent outcome.","test":"Outcome retrieval distinct from the policy in Q09."},
+    {"query_id":"Q15","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The fact formulation of the Graphiti conclusion belongs to personal.","expected_review":"rec-015 is accepted; rec-035 is equivalent, while rec-045 is superseded.","test":"Concept retrieval with current-state filtering."},
+    {"query_id":"Q16","primary_category":"lexical_exact","status":"pass","scope_review":"The deterministic touches relation is owned by ai-pos.","expected_review":"rec-016 is a valid accepted artifact link; rec-036 is equivalent.","test":"Relation and artifact-path retrieval."},
+    {"query_id":"Q17","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The isolation decision is owned by ai-pos-app.","expected_review":"rec-017 is accepted and rec-037 is equivalent.","test":"Decision retrieval for workspace isolation."},
+    {"query_id":"Q18","primary_category":"multilingual","status":"pass","scope_review":"The SQLite WAL outcome belongs to smart-timesheet.","expected_review":"rec-018 is accepted and rec-038 is equivalent.","test":"German query against English outcome text."},
+    {"query_id":"Q19","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The artifact-path fact belongs to abap-object-exporter.","expected_review":"rec-019 is accepted and rec-039 is equivalent.","test":"Fact retrieval for the ABAP artifact restriction."},
+    {"query_id":"Q20","primary_category":"semantic_paraphrase","status":"pass","scope_review":"The link is owned by personal even though its URI names ai-pos; record ownership defines scope.","expected_review":"rec-020 is the valid personal artifact link and rec-040 is equivalent.","test":"Artifact provenance without accidental scope expansion."},
+    {"query_id":"Q21","primary_category":"cross_workspace","status":"pass","scope_review":"The question explicitly asks for one ai-pos decision and one ai-pos-app artifact link, so both scopes are necessary.","expected_review":"rec-021 supplies the decision and rec-012 supplies the application link; declared alternatives are equivalent records only in the two authorized workspaces.","test":"Deliberate fan-out retrieval and rejection of every third-workspace result."},
+    {"query_id":"Q22","primary_category":"sensitive_explicit","status":"pass","scope_review":"The local-model decision is explicitly scoped to sensitive sap-work.","expected_review":"rec-053 is the accepted sensitive decision; no normal-scope alternative is valid.","test":"Explicit sensitive scope and sensitive_allowed policy."},
+    {"query_id":"Q23","primary_category":"multilingual","status":"pass","scope_review":"The German mini-core fact belongs to smart-timesheet.","expected_review":"rec-023 is accepted; rec-003 and rec-043 are equivalent facts in the same scope.","test":"Second multilingual fact retrieval."},
+    {"query_id":"Q24","primary_category":"lexical_exact","status":"pass","scope_review":"The artifact-link record is owned by abap-object-exporter.","expected_review":"rec-024 is valid; rec-004 and rec-044 are equivalent valid ABAP links.","test":"Exact README artifact lookup with validity enforcement."}
+  ]
+}

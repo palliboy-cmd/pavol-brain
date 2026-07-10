@@ -29,34 +29,14 @@
     "Q24"
   ],
   "valid_after_correction": 24,
-  "score_ready": false,
-  "score_ready_queries": [],
-  "semantic_review_queries": [
-    "Q01",
-    "Q02",
-    "Q03",
-    "Q04",
-    "Q05",
-    "Q06",
-    "Q07",
-    "Q08",
-    "Q09",
-    "Q10",
-    "Q11",
-    "Q12",
-    "Q13",
-    "Q14",
-    "Q15",
-    "Q16",
-    "Q17",
-    "Q18",
-    "Q19",
-    "Q20",
-    "Q21",
-    "Q22",
-    "Q23",
-    "Q24"
+  "score_ready": true,
+  "score_ready_queries": [
+    "Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08",
+    "Q09", "Q10", "Q11", "Q12", "Q13", "Q14", "Q15", "Q16",
+    "Q17", "Q18", "Q19", "Q20", "Q21", "Q22", "Q23", "Q24"
   ],
+  "semantic_review_queries": [],
+  "manual_review_report": "sqlite-spike/results/semantic-benchmark-manual-review.json",
   "issues_before_by_category": {
     "workspace_mismatch": 20
   },
