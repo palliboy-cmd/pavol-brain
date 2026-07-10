@@ -1,0 +1,11 @@
+# Local runtime and generated Python state
+.env
+.venv/
+**pycache**/
+*.pyc
+*.db
+*.db-shm
+*.db-wal
+results/runtime/
+spike/results/runtime/
+.DS_Store

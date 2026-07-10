@@ -1,0 +1,21 @@
+{
+  "source": "mini-core checkpoint run reported by user",
+  "graphiti_core": "0.29.2",
+  "falkordb": "4.14.9",
+  "profile": {
+    "profile": "local",
+    "base_url": "http://localhost:11434/v1",
+    "llm_model": "qwen3.6:35b-mlx",
+    "small_model": "qwen3.6:35b-mlx",
+    "embedder_model": "nomic-embed-text:latest",
+    "embedding_dim": 768
+  },
+  "N1": {
+    "status": "pass",
+    "measured": "explicit invalidation persisted; invalidated edge excluded from search"
+  },
+  "N2": {
+    "status": "pass",
+    "measured": "workspace group isolation held; retry created no duplicate"
+  }
+}

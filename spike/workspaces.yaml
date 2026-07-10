@@ -1,0 +1,7 @@
+workspaces:
+  ai-pos: {sensitivity: normal}
+  ai-pos-app: {sensitivity: normal}
+  smart-timesheet: {sensitivity: normal}
+  abap-object-exporter: {sensitivity: normal}
+  sap-work: {sensitivity: sensitive}
+  personal: {sensitivity: normal}
