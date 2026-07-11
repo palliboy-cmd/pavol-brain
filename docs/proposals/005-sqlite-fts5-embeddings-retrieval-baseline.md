@@ -1,6 +1,6 @@
 # Proposal 005: SQLite FTS5 + Embeddings Retrieval Baseline
 
-- **Status:** Draft for review — implementation not started
+- **Status:** Completed — GO WITH CONDITIONS (vector-only)
 - **Date:** 2026-07-10
 - **Follows:** [Proposal 002](002-pavol-brain-shared-memory-and-knowledge-graph.md), [Proposal 003](003-graphiti-spike-design.md), [Proposal 004](004-graphiti-spike-architecture-review.md)
 - **Decision input:** `spike/DECISION.md` — Graphiti NO; canonical journal retained
@@ -12,6 +12,8 @@
 Test whether a small, deterministic retrieval layer built from **SQLite FTS5 + local embeddings** is sufficient for Pavol-Brain over the existing canonical journal. The baseline reuses the Graphiti spike's records and 24 benchmark query IDs so results remain traceable, while removing LLM extraction and graph lifecycle from the retrieval path.
 
 The journal remains the only source of truth. FTS and vectors are disposable, rebuildable indexes. Typed artifact links and supersede chains remain explicit journal data; they are not inferred by a model.
+
+> **Final result (2026-07-11):** The FTS-only route missed S1 (top-3 70.83%). Local `nomic-embed-text:latest` exact-cosine retrieval achieved 91.67% top-1 and 100% top-3 with 51/51 embedding coverage and zero workspace, sensitive, or forbidden-status leaks. Hybrid RRF achieved 91.67% top-1 and 95.83% top-3, so it is not selected. Fresh build A/B equivalence and active-build switching passed. S4 noise rate is 10.53% (6/57 top-3 results), narrowly above the ≤10% threshold. The selected MVP direction is **vector-only**, with the bounded conditions recorded in `sqlite-spike/DECISION.md`.
 
 ## 2. Goals
 
