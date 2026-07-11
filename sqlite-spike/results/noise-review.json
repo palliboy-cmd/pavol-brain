@@ -1,0 +1,480 @@
+{
+  "source_report": "sqlite-spike/results/vector-baseline.json",
+  "queries": [
+    {
+      "query_id": "Q01",
+      "judgments": [
+        {
+          "record_id": "rec-021",
+          "rank": 1,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-041",
+          "rank": 2,
+          "judgment": "noise"
+        },
+        {
+          "record_id": "rec-001",
+          "rank": 3,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q02",
+      "judgments": [
+        {
+          "record_id": "rec-042",
+          "rank": 1,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-022",
+          "rank": 2,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-002",
+          "rank": 3,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q03",
+      "judgments": [
+        {
+          "record_id": "rec-003",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-043",
+          "rank": 2,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-023",
+          "rank": 3,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q04",
+      "judgments": [
+        {
+          "record_id": "rec-004",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-024",
+          "rank": 2,
+          "judgment": "noise"
+        },
+        {
+          "record_id": "rec-044",
+          "rank": 3,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q05",
+      "judgments": [
+        {
+          "record_id": "rec-025",
+          "rank": 1,
+          "judgment": "noise"
+        },
+        {
+          "record_id": "rec-005",
+          "rank": 2,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q06",
+      "judgments": [
+        {
+          "record_id": "rec-046",
+          "rank": 1,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-026",
+          "rank": 2,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-006",
+          "rank": 3,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q07",
+      "judgments": [
+        {
+          "record_id": "rec-007",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-027",
+          "rank": 2,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q08",
+      "judgments": [
+        {
+          "record_id": "rec-008",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-028",
+          "rank": 2,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q09",
+      "judgments": [
+        {
+          "record_id": "rec-029",
+          "rank": 1,
+          "judgment": "noise"
+        },
+        {
+          "record_id": "rec-009",
+          "rank": 2,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q10",
+      "judgments": [
+        {
+          "record_id": "rec-045",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-025",
+          "rank": 2,
+          "judgment": "noise"
+        },
+        {
+          "record_id": "rec-005",
+          "rank": 3,
+          "judgment": "noise"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q11",
+      "judgments": [
+        {
+          "record_id": "rec-011",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-031",
+          "rank": 2,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q12",
+      "judgments": [
+        {
+          "record_id": "rec-012",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-032",
+          "rank": 2,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-052",
+          "rank": 3,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q13",
+      "judgments": [
+        {
+          "record_id": "rec-033",
+          "rank": 1,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-013",
+          "rank": 2,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q14",
+      "judgments": [
+        {
+          "record_id": "rec-034",
+          "rank": 1,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-014",
+          "rank": 2,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q15",
+      "judgments": [
+        {
+          "record_id": "rec-015",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-035",
+          "rank": 2,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q16",
+      "judgments": [
+        {
+          "record_id": "rec-016",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-036",
+          "rank": 2,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q17",
+      "judgments": [
+        {
+          "record_id": "rec-017",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-037",
+          "rank": 2,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q18",
+      "judgments": [
+        {
+          "record_id": "rec-038",
+          "rank": 1,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-018",
+          "rank": 2,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q19",
+      "judgments": [
+        {
+          "record_id": "rec-039",
+          "rank": 1,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-019",
+          "rank": 2,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q20",
+      "judgments": [
+        {
+          "record_id": "rec-020",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-040",
+          "rank": 2,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q21",
+      "judgments": [
+        {
+          "record_id": "rec-012",
+          "rank": 1,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-016",
+          "rank": 2,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-032",
+          "rank": 3,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-036",
+          "rank": 4,
+          "judgment": "noise"
+        },
+        {
+          "record_id": "rec-052",
+          "rank": 5,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-041",
+          "rank": 6,
+          "judgment": "noise"
+        },
+        {
+          "record_id": "rec-021",
+          "rank": 7,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-001",
+          "rank": 8,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-017",
+          "rank": 9,
+          "judgment": "noise"
+        },
+        {
+          "record_id": "rec-037",
+          "rank": 10,
+          "judgment": "noise"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q22",
+      "judgments": [
+        {
+          "record_id": "rec-053",
+          "rank": 1,
+          "judgment": "relevant"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q23",
+      "judgments": [
+        {
+          "record_id": "rec-043",
+          "rank": 1,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-023",
+          "rank": 2,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-003",
+          "rank": 3,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    },
+    {
+      "query_id": "Q24",
+      "judgments": [
+        {
+          "record_id": "rec-004",
+          "rank": 1,
+          "judgment": "allowed"
+        },
+        {
+          "record_id": "rec-024",
+          "rank": 2,
+          "judgment": "relevant"
+        },
+        {
+          "record_id": "rec-044",
+          "rank": 3,
+          "judgment": "allowed"
+        }
+      ],
+      "review_basis": "curated expected_top and allowed_alternatives; no retrieval tuning applied"
+    }
+  ],
+  "returned_results_top3": 57,
+  "noise_results_top3": 6,
+  "noise_rate_top3": 0.10526315789473684,
+  "go_gate_s4": {
+    "threshold": "<=10%",
+    "pass": false
+  },
+  "diagnostic_returned_results_all": 64,
+  "diagnostic_noise_results_all": 10,
+  "diagnostic_noise_rate_all_returned": 0.15625,
+  "manual_review_status": "complete"
+}

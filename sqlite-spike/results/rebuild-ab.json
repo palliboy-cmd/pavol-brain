@@ -1,0 +1,51 @@
+{
+  "rebuild_equivalence": {
+    "projection_hashes": true,
+    "document_counts": true,
+    "embedding_bytes": true,
+    "vector_outcomes": true,
+    "hybrid_outcomes": true,
+    "pass": true
+  },
+  "active_build_switch": {
+    "build_a": true,
+    "build_b": true,
+    "failed_build_rejected": true,
+    "final_active_build": "build-b",
+    "pass": true
+  },
+  "coverage": {
+    "build-a": {
+      "embedded": 51,
+      "reused": 0,
+      "coverage": 51,
+      "contract": {
+        "profile": "local",
+        "base_url": "http://localhost:11434/v1",
+        "model": "nomic-embed-text:latest",
+        "dimension": 768,
+        "normalization": "l2_normalized_float32",
+        "document_prefix": "search_document: ",
+        "query_prefix": "search_query: ",
+        "fingerprint": "15d46550f6270eea40e1093f8c61eb20d78c52deebcd60106b5ed69916d2bda0",
+        "exact_model_identifier": "nomic-embed-text:latest"
+      }
+    },
+    "build-b": {
+      "embedded": 51,
+      "reused": 0,
+      "coverage": 51,
+      "contract": {
+        "profile": "local",
+        "base_url": "http://localhost:11434/v1",
+        "model": "nomic-embed-text:latest",
+        "dimension": 768,
+        "normalization": "l2_normalized_float32",
+        "document_prefix": "search_document: ",
+        "query_prefix": "search_query: ",
+        "fingerprint": "15d46550f6270eea40e1093f8c61eb20d78c52deebcd60106b5ed69916d2bda0",
+        "exact_model_identifier": "nomic-embed-text:latest"
+      }
+    }
+  }
+}

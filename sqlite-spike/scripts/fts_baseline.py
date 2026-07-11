@@ -68,7 +68,7 @@ def rebuild(db=DB, records=None):
     con.commit(); return {'documents':count,'db':str(db)}
 
 def fts_tokens(text): return re.findall(r"[\w]+",text,flags=re.UNICODE)
-def search(con, query):
+def search(con, query, limit=3):
     con.row_factory=sqlite3.Row
     filters=query['filters']; mode=filters['mode']; tokens=fts_tokens(query['query'])
     if not tokens: return []
@@ -81,7 +81,7 @@ def search(con, query):
       WHERE retrieval_fts MATCH ? AND d.workspace IN ({placeholders})
       AND d.type IN ({typeholders}) AND d.status IN ({statusholders})
       AND (? OR d.sensitivity='normal')
-      ORDER BY bm25_score ASC, d.confidence DESC, d.valid_at DESC, d.record_id ASC LIMIT 3'''
+      ORDER BY bm25_score ASC, d.confidence DESC, d.valid_at DESC, d.record_id ASC LIMIT {int(limit)}'''
     params=[match,*query['scope'],*filters['types'],*statuses,1 if filters.get('sensitive_allowed') else 0]
     return [dict(x) for x in con.execute(sql,params)]
 
@@ -104,13 +104,13 @@ def execute(db=DB, manifest=MANIFEST):
         runs.append({'query_id':q['id'],'query':q['query'],'scope':q['scope'],'filters':q['filters'],'expected_top':q['expected_top'],'allowed_alternatives':q['allowed_alternatives'],'returned':returned,'top1_pass':top1,'top3_pass':top3,'failure_condition':q['failure_condition'],'failure_condition_pass':not any(leaks.values()),'leaks':leaks,'latency_ms':elapsed,'tags':q['tags']})
     return runs
 
-def evaluate(runs):
+def evaluate(runs, not_evaluated=None):
     n=len(runs); lat=[x['latency_ms'] for x in runs]; allrows=[r for x in runs for r in x['returned']]
     multilingual=[x for x in runs if 'multilingual' in x['tags']]; historical=[x for x in runs if 'historical' in x['tags']]
     return {'queries':n,'top1_rate':sum(x['top1_pass'] for x in runs)/n,'top3_rate':sum(x['top3_pass'] for x in runs)/n,
       'workspace_leaks':sum(x['leaks']['workspace'] for x in runs),'sensitive_leaks':sum(x['leaks']['sensitive'] for x in runs),'forbidden_status_leaks':sum(x['leaks']['forbidden_status'] for x in runs),
       'latency_ms':{'p50':percentile(lat,.5),'p95':percentile(lat,.95)},
-      'not_evaluated':['embeddings','cosine','rrf','rebuild_equivalence','noise_rate_manual'],
+      'not_evaluated':not_evaluated if not_evaluated is not None else ['embeddings','cosine','rrf','rebuild_equivalence','noise_rate_manual'],
       'multilingual_top3_rate':sum(x['top3_pass'] for x in multilingual)/len(multilingual) if multilingual else None,
       'historical_top3_rate':sum(x['top3_pass'] for x in historical)/len(historical) if historical else None,
       'failed_queries':[x['query_id'] for x in runs if not(x['top3_pass'] and x['failure_condition_pass'])],
