@@ -11,6 +11,8 @@
 
 **NO for the tested local Graphiti 0.29.2 + structured-output stack; graph retrieval quality was not evaluated.** The SQLite retrieval baseline ended **GO WITH CONDITIONS — vector-only**: FTS-only missed the top-3 gate (70.83%), hybrid RRF passed but scored below vector-only (95.83% vs 100% top-3) and is not used. Vector-only achieved 91.67% top-1, 100% top-3, zero workspace/sensitive/status leaks, p95 under 31 ms, and 51/51 embedding coverage. A/B rebuild equivalence and the active-build switch both passed; S4 noise failed at 10.53% (threshold ≤10%), which is why the verdict carries conditions rather than a plain GO.
 
+> **Erratum (2026-07-12 — ranking compatibility):** `sqlite-spike/results/vector-baseline.json` is immutable historical retrieval-quality evidence. Its explicit route sort was `score DESC, accepted-first, confidence DESC, valid_at ASC, record_id ASC`, yielding top-1 91.67%, top-3 100%, and S4 noise 10.53%. It is not the normative integration order. `sqlite-spike/results/vector-contract-baseline-v1.json` uses the same frozen queries, embeddings, build, candidates, and filters with the contract order `score DESC, valid_at DESC, record_id ASC`; it yields top-1 91.67%, top-3 95.83%, S4 noise 12.28%, and zero safety leaks. Slice 1 reports historical differences rather than redefining historical evidence. The verdict remains **GO WITH CONDITIONS — vector-only**; contract S4 remains FAIL and production conditions stay open.
+
 This proposal defines the integration layer on top of that result:
 
 - **Backend:** SQLite + local embeddings + exact cosine over the full eligible candidate set. `nomic-embed-text:latest` is the provisional spike baseline, not the final model decision.
@@ -296,7 +298,9 @@ Each slice is independently shippable and reviewable; Slices 5–6 gate the prod
 
 ## 21. Acceptance criteria
 
-- **Baseline parity:** the library returns identical top-3 results and ordering to `results/vector-baseline.json` for all 24 scored queries on the same build.
+- **Candidate-and-score parity:** the library matches the historical `results/vector-baseline.json` candidates and raw cosine scores for all frozen queries on the same build.
+- **Contract-order parity:** the library matches `results/vector-contract-baseline-v1.json` for all 24 query orders under `score DESC, valid_at DESC, record_id ASC`.
+- **Historical-order visibility:** any difference from the historical vector route order is reported explicitly; historical order parity is not a Slice 1 failure and the historical baseline is never silently redefined.
 - **Zero leaks:** no workspace, sensitivity, or forbidden-status leak in any test, including adversarial scope combinations — hard invariant, not a rate.
 - **Determinism:** repeated identical queries against the same build return byte-identical rankings.
 - **Provenance complete:** every result in every test resolves to a journal record with valid `projection_hash` and `source_event_id`; a synthetic orphan is refused, not returned.

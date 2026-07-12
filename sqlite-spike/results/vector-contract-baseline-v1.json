@@ -1,0 +1,1108 @@
+{
+  "schema": "vector-contract-baseline",
+  "version": "v1",
+  "generated_at": "2026-07-12T11:17:30.701297+00:00",
+  "source_historical_baseline": {
+    "path": "sqlite-spike/results/vector-baseline.json",
+    "sha256": "5caa94f8b6d2ebc82571e290d574cf267016ac03997ab0e374bb9cc2687b68b6"
+  },
+  "retrieval_build_id": "baseline",
+  "model_fingerprint": "15d46550f6270eea40e1093f8c61eb20d78c52deebcd60106b5ed69916d2bda0",
+  "ranking_policy": "score DESC, valid_at DESC, record_id ASC",
+  "contract_compatibility_evidence": true,
+  "historical_evidence_rewritten": false,
+  "results": [
+    {
+      "query_id": "Q01",
+      "query": "Kde n\u00e1vrh odde\u013euje audit od samotn\u00e9ho vykonania dotazu?",
+      "scope": [
+        "ai-pos"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-021",
+          "rank": 1,
+          "raw_score": 0.5311103336630915,
+          "workspace": "ai-pos",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:20+00:00",
+          "projection_hash": "b53950d7795c85480d36b7c70703ae5230a60d2abafbff91893587faf98da932"
+        },
+        {
+          "record_id": "rec-041",
+          "rank": 2,
+          "raw_score": 0.5306871615756442,
+          "workspace": "ai-pos",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:40+00:00",
+          "projection_hash": "5489067b7445c355253dfcf377f4de1ec755b21412e2ea22a18f0c48f4ed1e02"
+        },
+        {
+          "record_id": "rec-001",
+          "rank": 3,
+          "raw_score": 0.5150544262015705,
+          "workspace": "ai-pos",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:00+00:00",
+          "projection_hash": "80f3a6fa2417c05bfc1881e830dad8edaabce3777699fe02b49e86759186f428"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q02",
+      "query": "\u010co m\u00e1 zosta\u0165 autoritat\u00edvnym z\u00e1znamom v\u00fdsledku, ke\u010f sa men\u00ed vyh\u013ead\u00e1vacia vrstva?",
+      "scope": [
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "outcome"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-042",
+          "rank": 1,
+          "raw_score": 0.45496420942787846,
+          "workspace": "ai-pos-app",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:41+00:00",
+          "projection_hash": "38ce3b1822ff8bb8eb632bb9b6ad0af4c1ad27b3d347c017ea2e6ac627ade722"
+        },
+        {
+          "record_id": "rec-022",
+          "rank": 2,
+          "raw_score": 0.4501887165042226,
+          "workspace": "ai-pos-app",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:21+00:00",
+          "projection_hash": "72bbcdd9982a16d73d58c9d09cdfe477bf08babd4cb27a874226275842d3799b"
+        },
+        {
+          "record_id": "rec-002",
+          "rank": 3,
+          "raw_score": 0.44595554901844897,
+          "workspace": "ai-pos-app",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:01+00:00",
+          "projection_hash": "c46062e85851096dc39e53534bfa5f17ea6b03a530852efc3f9b82f52c7afbea"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q03",
+      "query": "Na akom stroji je nasaden\u00fd Compose pre timesheetov\u00e9 prostredie?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-003",
+          "rank": 1,
+          "raw_score": 0.5251797809081937,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:02+00:00",
+          "projection_hash": "62b824560cb80bbe449e14e02fa47bf1508b69464a8b9898f7095be07e9b0ce9"
+        },
+        {
+          "record_id": "rec-043",
+          "rank": 2,
+          "raw_score": 0.5210496472508396,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:42+00:00",
+          "projection_hash": "0933f1f415a520619e490da42276f00d4223c3b121e1aba3840a8410d39e57ca"
+        },
+        {
+          "record_id": "rec-023",
+          "rank": 3,
+          "raw_score": 0.5159178041390189,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:22+00:00",
+          "projection_hash": "636dbc7cea527b48fe29f803bb9b3042aa0ba430c7d9caf54bec4c7004b5e7f3"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q04",
+      "query": "N\u00e1jdi deterministick\u00fd link z ABAP exportu na spolo\u010dn\u00fd README s\u00fabor.",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-044",
+          "rank": 1,
+          "raw_score": 0.6225475119782226,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:43+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-024",
+          "rank": 2,
+          "raw_score": 0.6225475119782226,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:23+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-004",
+          "rank": 3,
+          "raw_score": 0.6225475119782226,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:03+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q05",
+      "query": "Ako m\u00e1 architekt\u00fara ch\u00e1pa\u0165 Graphiti po odstr\u00e1nen\u00ed odvoden\u00e9ho indexu?",
+      "scope": [
+        "personal"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-025",
+          "rank": 1,
+          "raw_score": 0.6239202083692211,
+          "workspace": "personal",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:24+00:00",
+          "projection_hash": "e216e9a511ccdd3c123f89270cc89194b91aadd36dd21fd0711c6097d714f425"
+        },
+        {
+          "record_id": "rec-005",
+          "rank": 2,
+          "raw_score": 0.6161849450407946,
+          "workspace": "personal",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:04+00:00",
+          "projection_hash": "7dbfff834ae5f76d156f67385985903455fb74de8f2d7e50682b611aba017695"
+        }
+      ],
+      "top1_pass": false,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q06",
+      "query": "\u010co e\u0161te treba overi\u0165 pred t\u00fdm, ne\u017e s\u00fa release notes pripraven\u00e9?",
+      "scope": [
+        "ai-pos"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "outcome"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-046",
+          "rank": 1,
+          "raw_score": 0.5490432713273825,
+          "workspace": "ai-pos",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:45+00:00",
+          "projection_hash": "a889b53bb26801648126a03e37dd688131f1f106ea763f703bfb077836edc568"
+        },
+        {
+          "record_id": "rec-026",
+          "rank": 2,
+          "raw_score": 0.5414652534408912,
+          "workspace": "ai-pos",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:25+00:00",
+          "projection_hash": "1b2dfdf03fc6bb41364343cecbf7c328c62ec0a473398fab0c62b1a704cd7cd6"
+        },
+        {
+          "record_id": "rec-006",
+          "rank": 3,
+          "raw_score": 0.5377547751008267,
+          "workspace": "ai-pos",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:05+00:00",
+          "projection_hash": "27d25eae5740756e5346a70108b9f50cdf6d45e0edac45feec6280dacd46f2c8"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q07",
+      "query": "Je izol\u00e1cia wrkspacov povinn\u00e1?",
+      "scope": [
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-007",
+          "rank": 1,
+          "raw_score": 0.4838179926591696,
+          "workspace": "ai-pos-app",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:06+00:00",
+          "projection_hash": "7c37d9969c5b1fc1a14adf911fd61d7719f3a57fbf49bd11fd0e33e41a33fa28"
+        },
+        {
+          "record_id": "rec-027",
+          "rank": 2,
+          "raw_score": 0.4836542912837684,
+          "workspace": "ai-pos-app",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:26+00:00",
+          "projection_hash": "b49fc16032842ed32156d670e32565aafd75d37bd7f304f3340dc7bbc9ae1587"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q08",
+      "query": "Ktor\u00fd evidovan\u00fd link v timesheete ukazuje na spolo\u010dn\u00fa projektov\u00fa dokument\u00e1ciu?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-028",
+          "rank": 1,
+          "raw_score": 0.5178456342828948,
+          "workspace": "smart-timesheet",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:27+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-008",
+          "rank": 2,
+          "raw_score": 0.5178456342828948,
+          "workspace": "smart-timesheet",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:07+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q09",
+      "query": "Ak\u00e9 pravidlo plat\u00ed pre pr\u00e1cu so zdrojovou \u0161trukt\u00farou ABAP export\u00e9ra?",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-029",
+          "rank": 1,
+          "raw_score": 0.4301677721186186,
+          "workspace": "abap-object-exporter",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:28+00:00",
+          "projection_hash": "cba6292460218e68fcb8f5875e7f2d3b28a03757af554a84033abc245eb6a6f1"
+        },
+        {
+          "record_id": "rec-009",
+          "rank": 2,
+          "raw_score": 0.42565030678597404,
+          "workspace": "abap-object-exporter",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:08+00:00",
+          "projection_hash": "3f3265b8dee86b75191269aebe56264d6a4730d069d9333b27eeac66c31426b3"
+        }
+      ],
+      "top1_pass": false,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q10",
+      "query": "Ak\u00e9 star\u0161ie rozhodnutie o Graphiti patr\u00ed do hist\u00f3rie, nie medzi platn\u00e9 odpor\u00fa\u010dania?",
+      "scope": [
+        "personal"
+      ],
+      "filters": {
+        "mode": "historical",
+        "types": [
+          "decision"
+        ],
+        "include_superseded": true,
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-045",
+          "rank": 1,
+          "raw_score": 0.5278816077099502,
+          "workspace": "personal",
+          "type": "decision",
+          "status": "superseded",
+          "valid_at": "2026-07-10T00:00:44+00:00",
+          "projection_hash": "562f1bb368b7c19cd798789a4da08fe3fa88f3eb5a3ca59f828f7f43fe683a64"
+        },
+        {
+          "record_id": "rec-025",
+          "rank": 2,
+          "raw_score": 0.5248444231047967,
+          "workspace": "personal",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:24+00:00",
+          "projection_hash": "e216e9a511ccdd3c123f89270cc89194b91aadd36dd21fd0711c6097d714f425"
+        },
+        {
+          "record_id": "rec-005",
+          "rank": 3,
+          "raw_score": 0.5213602835643658,
+          "workspace": "personal",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:04+00:00",
+          "projection_hash": "7dbfff834ae5f76d156f67385985903455fb74de8f2d7e50682b611aba017695"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q11",
+      "query": "Ktor\u00e1 z\u00e1sada stanovuje hranicu medzi auditom a retrievalom?",
+      "scope": [
+        "ai-pos"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-011",
+          "rank": 1,
+          "raw_score": 0.48484165010960595,
+          "workspace": "ai-pos",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:10+00:00",
+          "projection_hash": "415298a1f6d5015ec1277ff58241957c0cd0272a81085ff14f9e71023764ffa7"
+        },
+        {
+          "record_id": "rec-031",
+          "rank": 2,
+          "raw_score": 0.4804888377559236,
+          "workspace": "ai-pos",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:30+00:00",
+          "projection_hash": "086dbc5784e4913c812c0a0a7f0835e2794924ad42057441d08b68f8d59a8f9c"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q12",
+      "query": "V aplik\u00e1cii ai-pos n\u00e1jdi ulo\u017een\u00fa v\u00e4zbu na README spolo\u010dn\u00e9ho repozit\u00e1ra.",
+      "scope": [
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-052",
+          "rank": 1,
+          "raw_score": 0.5914918884142737,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:51+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-032",
+          "rank": 2,
+          "raw_score": 0.5914918884142737,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:31+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-012",
+          "rank": 3,
+          "raw_score": 0.5914918884142737,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:11+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q13",
+      "query": "\u010co hovor\u00ed rozhodnutie Smart Timesheetu o sp\u00fa\u0161\u0165an\u00ed Docker Compose?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-033",
+          "rank": 1,
+          "raw_score": 0.6554900326595394,
+          "workspace": "smart-timesheet",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:32+00:00",
+          "projection_hash": "22847b69b069e642464fd8fa36e34dbcff11ab4b5afd7d1f9cd144b17007ce3d"
+        },
+        {
+          "record_id": "rec-013",
+          "rank": 2,
+          "raw_score": 0.6535019274964957,
+          "workspace": "smart-timesheet",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:12+00:00",
+          "projection_hash": "6645a88dcc59dbea9a45f4805b9a326a69ff008b194a56f7ba741a9f109b11f8"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q14",
+      "query": "Ak\u00fd v\u00fdsledok potvrdzuje, \u017ee ABAP export zachov\u00e1va p\u00f4vodn\u00e9 usporiadanie zdrojov?",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "outcome"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-034",
+          "rank": 1,
+          "raw_score": 0.5743964032017076,
+          "workspace": "abap-object-exporter",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:33+00:00",
+          "projection_hash": "8e263e397e1fdc5cfff54a56e8819bc87b8096c38423c04b9302f82cf7fc3417"
+        },
+        {
+          "record_id": "rec-014",
+          "rank": 2,
+          "raw_score": 0.5705032258398287,
+          "workspace": "abap-object-exporter",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:13+00:00",
+          "projection_hash": "10ecf2c30505d038644cb069ac8f4a5460b90928805974d17a5e0693f7fdf96c"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q15",
+      "query": "\u010co v tomto n\u00e1vrhu znamen\u00e1, \u017ee Graphiti je vymazate\u013en\u00fd index?",
+      "scope": [
+        "personal"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-015",
+          "rank": 1,
+          "raw_score": 0.5961708675922992,
+          "workspace": "personal",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:14+00:00",
+          "projection_hash": "dc266b3e239b1beefb34362468eb14d16ab3d7aed72c0514869fd65c4b487f57"
+        },
+        {
+          "record_id": "rec-035",
+          "rank": 2,
+          "raw_score": 0.5943723261165903,
+          "workspace": "personal",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:34+00:00",
+          "projection_hash": "51ae0c1c1c4e394ca6c0180923b6a0706d3dd1b8c8c7bbbabccc523ae374cbff"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q16",
+      "query": "Kde je vz\u0165ah k README ozna\u010den\u00fd ako deterministick\u00fd a typu touches?",
+      "scope": [
+        "ai-pos"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-036",
+          "rank": 1,
+          "raw_score": 0.6892393946576331,
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:35+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-016",
+          "rank": 2,
+          "raw_score": 0.6892393946576331,
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:15+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q17",
+      "query": "Pre\u010do mus\u00ed aplik\u00e1cia pam\u00e4ti odde\u013eova\u0165 jednotliv\u00e9 pracovn\u00e9 priestory?",
+      "scope": [
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-017",
+          "rank": 1,
+          "raw_score": 0.4198577328152279,
+          "workspace": "ai-pos-app",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:16+00:00",
+          "projection_hash": "d94dfe705cfcee3d6a9759e5349e05f58a03f16f961c871fb68664f02eb574c2"
+        },
+        {
+          "record_id": "rec-037",
+          "rank": 2,
+          "raw_score": 0.41877261046372016,
+          "workspace": "ai-pos-app",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:36+00:00",
+          "projection_hash": "7abb016f2dcdf5de739ebb20cd28477c5d99a1784dec429d84f8fa6b523f8a49"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q18",
+      "query": "Welches Speicherverfahren erlaubt Journal-Schreibvorg\u00e4nge ohne blockierende Leser?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "outcome"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-038",
+          "rank": 1,
+          "raw_score": 0.4651121905824003,
+          "workspace": "smart-timesheet",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:37+00:00",
+          "projection_hash": "6affb4fbd63b0d3c016954f2227fd8528bdc54a22b23d9b2c4b3e6f546f85474"
+        },
+        {
+          "record_id": "rec-018",
+          "rank": 2,
+          "raw_score": 0.45871876654152804,
+          "workspace": "smart-timesheet",
+          "type": "outcome",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:17+00:00",
+          "projection_hash": "0f52a82a9bccc3a5db2d4163fe4b57c9f5f2e0abb9db78b384ba31a48a7fb2b0"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q19",
+      "query": "Ak\u00e9 obmedzenie plat\u00ed pre cesty k artefaktom ABAP export\u00e9ra?",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-039",
+          "rank": 1,
+          "raw_score": 0.4724085382020108,
+          "workspace": "abap-object-exporter",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:38+00:00",
+          "projection_hash": "1334e3acf552daead7350ed905b5a5ae62fd81daf47ea6d7ad45e4da9a0bc654"
+        },
+        {
+          "record_id": "rec-019",
+          "rank": 2,
+          "raw_score": 0.467117414836222,
+          "workspace": "abap-object-exporter",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:18+00:00",
+          "projection_hash": "3c3a591ccfb2f59f695f2e20c180d437b72030289e2bf5a6bbfdbf05119ec5f5"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q20",
+      "query": "Ktor\u00fd osobn\u00fd z\u00e1znam prep\u00e1ja evidovan\u00fd v\u00fdsledok s README z projektu ai-pos?",
+      "scope": [
+        "personal"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-040",
+          "rank": 1,
+          "raw_score": 0.6156767151671476,
+          "workspace": "personal",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:39+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-020",
+          "rank": 2,
+          "raw_score": 0.6156767151671476,
+          "workspace": "personal",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:19+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q21",
+      "query": "Ktor\u00e9 rozhodnutie v ai-pos zav\u00e1dza query boundary a kde v ai-pos-app n\u00e1jdem jeho README v\u00e4zbu?",
+      "scope": [
+        "ai-pos",
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision",
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-052",
+          "rank": 1,
+          "raw_score": 0.6468717673612367,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:51+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-036",
+          "rank": 2,
+          "raw_score": 0.6468717673612367,
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:35+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-032",
+          "rank": 3,
+          "raw_score": 0.6468717673612367,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:31+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-016",
+          "rank": 4,
+          "raw_score": 0.6468717673612367,
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:15+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-012",
+          "rank": 5,
+          "raw_score": 0.6468717673612367,
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:11+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-041",
+          "rank": 6,
+          "raw_score": 0.5621209589118095,
+          "workspace": "ai-pos",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:40+00:00",
+          "projection_hash": "5489067b7445c355253dfcf377f4de1ec755b21412e2ea22a18f0c48f4ed1e02"
+        },
+        {
+          "record_id": "rec-021",
+          "rank": 7,
+          "raw_score": 0.5587569160910056,
+          "workspace": "ai-pos",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:20+00:00",
+          "projection_hash": "b53950d7795c85480d36b7c70703ae5230a60d2abafbff91893587faf98da932"
+        },
+        {
+          "record_id": "rec-001",
+          "rank": 8,
+          "raw_score": 0.5521832149787167,
+          "workspace": "ai-pos",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:00+00:00",
+          "projection_hash": "80f3a6fa2417c05bfc1881e830dad8edaabce3777699fe02b49e86759186f428"
+        },
+        {
+          "record_id": "rec-017",
+          "rank": 9,
+          "raw_score": 0.5039195386626882,
+          "workspace": "ai-pos-app",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:16+00:00",
+          "projection_hash": "d94dfe705cfcee3d6a9759e5349e05f58a03f16f961c871fb68664f02eb574c2"
+        },
+        {
+          "record_id": "rec-037",
+          "rank": 10,
+          "raw_score": 0.5018633809147957,
+          "workspace": "ai-pos-app",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:36+00:00",
+          "projection_hash": "7abb016f2dcdf5de739ebb20cd28477c5d99a1784dec429d84f8fa6b523f8a49"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": false
+    },
+    {
+      "query_id": "Q22",
+      "query": "Ak\u00e9 rozhodnutie plat\u00ed pre lok\u00e1lny model v citlivom pracovnom priestore?",
+      "scope": [
+        "sap-work"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision"
+        ],
+        "sensitive_allowed": true
+      },
+      "results": [
+        {
+          "record_id": "rec-053",
+          "rank": 1,
+          "raw_score": 0.7700878277607618,
+          "workspace": "sap-work",
+          "type": "decision",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:52+00:00",
+          "projection_hash": "2a5be26201fe69976cecaa54d170c0b41658c8c7c7dbd0660b9ce92b42e9e40d"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q23",
+      "query": "Wo wird Docker Compose f\u00fcr die Zeiterfassung betrieben?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "fact"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-043",
+          "rank": 1,
+          "raw_score": 0.5965538310640834,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:42+00:00",
+          "projection_hash": "0933f1f415a520619e490da42276f00d4223c3b121e1aba3840a8410d39e57ca"
+        },
+        {
+          "record_id": "rec-023",
+          "rank": 2,
+          "raw_score": 0.5938699281718567,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:22+00:00",
+          "projection_hash": "636dbc7cea527b48fe29f803bb9b3042aa0ba430c7d9caf54bec4c7004b5e7f3"
+        },
+        {
+          "record_id": "rec-003",
+          "rank": 3,
+          "raw_score": 0.5932062960182131,
+          "workspace": "smart-timesheet",
+          "type": "fact",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:02+00:00",
+          "projection_hash": "62b824560cb80bbe449e14e02fa47bf1508b69464a8b9898f7095be07e9b0ce9"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    },
+    {
+      "query_id": "Q24",
+      "query": "N\u00e1jdi ABAP artifact link, ktor\u00fd ukazuje na README projektu ai-pos.",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "results": [
+        {
+          "record_id": "rec-044",
+          "rank": 1,
+          "raw_score": 0.5605741974849918,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:43+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-024",
+          "rank": 2,
+          "raw_score": 0.5605741974849918,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:23+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        },
+        {
+          "record_id": "rec-004",
+          "rank": 3,
+          "raw_score": 0.5605741974849918,
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "status": "accepted",
+          "valid_at": "2026-07-10T00:00:03+00:00",
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf"
+        }
+      ],
+      "top1_pass": true,
+      "top3_pass": true
+    }
+  ],
+  "metrics": {
+    "top1_count": 22,
+    "top1_rate": 0.9166666666666666,
+    "top3_count": 23,
+    "top3_rate": 0.9583333333333334,
+    "workspace_leaks": 0,
+    "sensitive_leaks": 0,
+    "forbidden_status_leaks": 0,
+    "multilingual_top3_rate": 1.0,
+    "historical_top3_rate": 1,
+    "noise_count_top3": 7,
+    "returned_results_top3": 57,
+    "noise_rate_top3": 0.12280701754385964,
+    "noise_status": "evaluated",
+    "unjudged": []
+  },
+  "decision_hint": "contract_compatibility_evidence_only"
+}

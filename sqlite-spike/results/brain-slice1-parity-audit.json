@@ -1,0 +1,532 @@
+{
+  "baseline_semantics": {
+    "candidate_sql": "filtered SQL without ORDER BY; Python vector_search ranks all eligible rows",
+    "document_dtype": "float32 BLOB (struct <f)",
+    "query_dtype": "Python float after JSON response, L2 normalized",
+    "document_normalization": "L2-normalized before float32 storage",
+    "cosine": "Python sum(a*b for zip(query, document)) without score rounding",
+    "sort_key": "(-vector_score, status accepted first, -confidence, valid_at ASC, record_id ASC)",
+    "report_scores": "raw Python float serialized by json; no display rounding before rank",
+    "order_source": "explicit Python stable sort with full baseline _tie"
+  },
+  "slice1_semantics": {
+    "document_dtype": "float32 BLOB (struct <f)",
+    "query_dtype": "Python float after JSON response, L2 normalized",
+    "cosine": "same Python sum(a*b for zip(query, document)) without score rounding",
+    "sort_key": "score DESC, valid_at DESC, record_id ASC",
+    "timestamp": "ISO-8601 strings from stored build, lexical UTC order",
+    "order_source": "three stable Python sorts, explicit total order"
+  },
+  "mismatches": [
+    {
+      "query_id": "Q04",
+      "query": "N\u00e1jdi deterministick\u00fd link z ABAP exportu na spolo\u010dn\u00fd README s\u00fabor.",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "query_embedding_sha256": "d4c98ce88580fd5eb7adf0f02ef4937a66a12b4ba02f6d353a1d77e09c330f7b",
+      "baseline_top5": [
+        "rec-004",
+        "rec-024",
+        "rec-044"
+      ],
+      "slice1_top5": [
+        "rec-044",
+        "rec-024",
+        "rec-004"
+      ],
+      "candidates": [
+        {
+          "record_id": "rec-004",
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:03+00:00",
+          "baseline_raw_score": 0.6225475119782226,
+          "slice1_raw_score": 0.6225475119782226,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 1,
+          "slice1_rank": 3,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-024",
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:23+00:00",
+          "baseline_raw_score": 0.6225475119782226,
+          "slice1_raw_score": 0.6225475119782226,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 2,
+          "slice1_rank": 2,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-044",
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:43+00:00",
+          "baseline_raw_score": 0.6225475119782226,
+          "slice1_raw_score": 0.6225475119782226,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 3,
+          "slice1_rank": 1,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        }
+      ],
+      "classification": "D.BASELINE_EXPLICIT_TIEBREAK_DIFFERENCE",
+      "evidence": "baseline _tie uses valid_at ASC; Slice 1 contract uses valid_at DESC after equal raw cosine",
+      "top3_membership_change": {
+        "added_to_contract_top3": [],
+        "removed_from_contract_top3": []
+      }
+    },
+    {
+      "query_id": "Q08",
+      "query": "Ktor\u00fd evidovan\u00fd link v timesheete ukazuje na spolo\u010dn\u00fa projektov\u00fa dokument\u00e1ciu?",
+      "scope": [
+        "smart-timesheet"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "query_embedding_sha256": "ec060425febb36f7951915555e190dc587c2d86b51fbf0a8e25af246816df9fc",
+      "baseline_top5": [
+        "rec-008",
+        "rec-028"
+      ],
+      "slice1_top5": [
+        "rec-028",
+        "rec-008"
+      ],
+      "candidates": [
+        {
+          "record_id": "rec-008",
+          "workspace": "smart-timesheet",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:07+00:00",
+          "baseline_raw_score": 0.5178456342828948,
+          "slice1_raw_score": 0.5178456342828948,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 1,
+          "slice1_rank": 2,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-028",
+          "workspace": "smart-timesheet",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:27+00:00",
+          "baseline_raw_score": 0.5178456342828948,
+          "slice1_raw_score": 0.5178456342828948,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 2,
+          "slice1_rank": 1,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        }
+      ],
+      "classification": "D.BASELINE_EXPLICIT_TIEBREAK_DIFFERENCE",
+      "evidence": "baseline _tie uses valid_at ASC; Slice 1 contract uses valid_at DESC after equal raw cosine",
+      "top3_membership_change": {
+        "added_to_contract_top3": [],
+        "removed_from_contract_top3": []
+      }
+    },
+    {
+      "query_id": "Q12",
+      "query": "V aplik\u00e1cii ai-pos n\u00e1jdi ulo\u017een\u00fa v\u00e4zbu na README spolo\u010dn\u00e9ho repozit\u00e1ra.",
+      "scope": [
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "query_embedding_sha256": "31f64b422647b670ef88e2e92249253721d130d4e0a856c4c55e8fca9848fd66",
+      "baseline_top5": [
+        "rec-012",
+        "rec-032",
+        "rec-052"
+      ],
+      "slice1_top5": [
+        "rec-052",
+        "rec-032",
+        "rec-012"
+      ],
+      "candidates": [
+        {
+          "record_id": "rec-012",
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:11+00:00",
+          "baseline_raw_score": 0.5914918884142737,
+          "slice1_raw_score": 0.5914918884142737,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 1,
+          "slice1_rank": 3,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-032",
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:31+00:00",
+          "baseline_raw_score": 0.5914918884142737,
+          "slice1_raw_score": 0.5914918884142737,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 2,
+          "slice1_rank": 2,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-052",
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:51+00:00",
+          "baseline_raw_score": 0.5914918884142737,
+          "slice1_raw_score": 0.5914918884142737,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 3,
+          "slice1_rank": 1,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        }
+      ],
+      "classification": "D.BASELINE_EXPLICIT_TIEBREAK_DIFFERENCE",
+      "evidence": "baseline _tie uses valid_at ASC; Slice 1 contract uses valid_at DESC after equal raw cosine",
+      "top3_membership_change": {
+        "added_to_contract_top3": [],
+        "removed_from_contract_top3": []
+      }
+    },
+    {
+      "query_id": "Q16",
+      "query": "Kde je vz\u0165ah k README ozna\u010den\u00fd ako deterministick\u00fd a typu touches?",
+      "scope": [
+        "ai-pos"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "query_embedding_sha256": "23bce4a310015bed2cc292438335d34683634de22c4725d9a293063ab0d11ddb",
+      "baseline_top5": [
+        "rec-016",
+        "rec-036"
+      ],
+      "slice1_top5": [
+        "rec-036",
+        "rec-016"
+      ],
+      "candidates": [
+        {
+          "record_id": "rec-016",
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:15+00:00",
+          "baseline_raw_score": 0.6892393946576331,
+          "slice1_raw_score": 0.6892393946576331,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 1,
+          "slice1_rank": 2,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-036",
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:35+00:00",
+          "baseline_raw_score": 0.6892393946576331,
+          "slice1_raw_score": 0.6892393946576331,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 2,
+          "slice1_rank": 1,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        }
+      ],
+      "classification": "D.BASELINE_EXPLICIT_TIEBREAK_DIFFERENCE",
+      "evidence": "baseline _tie uses valid_at ASC; Slice 1 contract uses valid_at DESC after equal raw cosine",
+      "top3_membership_change": {
+        "added_to_contract_top3": [],
+        "removed_from_contract_top3": []
+      }
+    },
+    {
+      "query_id": "Q20",
+      "query": "Ktor\u00fd osobn\u00fd z\u00e1znam prep\u00e1ja evidovan\u00fd v\u00fdsledok s README z projektu ai-pos?",
+      "scope": [
+        "personal"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "query_embedding_sha256": "a0982a1264ae507e9cabc2d6175da49522724ca6f657e967eac12faeea19c5f0",
+      "baseline_top5": [
+        "rec-020",
+        "rec-040"
+      ],
+      "slice1_top5": [
+        "rec-040",
+        "rec-020"
+      ],
+      "candidates": [
+        {
+          "record_id": "rec-020",
+          "workspace": "personal",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:19+00:00",
+          "baseline_raw_score": 0.6156767151671476,
+          "slice1_raw_score": 0.6156767151671476,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 1,
+          "slice1_rank": 2,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-040",
+          "workspace": "personal",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:39+00:00",
+          "baseline_raw_score": 0.6156767151671476,
+          "slice1_raw_score": 0.6156767151671476,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 2,
+          "slice1_rank": 1,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        }
+      ],
+      "classification": "D.BASELINE_EXPLICIT_TIEBREAK_DIFFERENCE",
+      "evidence": "baseline _tie uses valid_at ASC; Slice 1 contract uses valid_at DESC after equal raw cosine",
+      "top3_membership_change": {
+        "added_to_contract_top3": [],
+        "removed_from_contract_top3": []
+      }
+    },
+    {
+      "query_id": "Q21",
+      "query": "Ktor\u00e9 rozhodnutie v ai-pos zav\u00e1dza query boundary a kde v ai-pos-app n\u00e1jdem jeho README v\u00e4zbu?",
+      "scope": [
+        "ai-pos",
+        "ai-pos-app"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "decision",
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "query_embedding_sha256": "33783fa3956bb4742e295bcddbcc18f6e8117010f9d4ff60f8994ffdeda7046d",
+      "baseline_top5": [
+        "rec-012",
+        "rec-016",
+        "rec-032",
+        "rec-036",
+        "rec-052"
+      ],
+      "slice1_top5": [
+        "rec-052",
+        "rec-036",
+        "rec-032",
+        "rec-016",
+        "rec-012"
+      ],
+      "candidates": [
+        {
+          "record_id": "rec-012",
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:11+00:00",
+          "baseline_raw_score": 0.6468717673612367,
+          "slice1_raw_score": 0.6468717673612367,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 1,
+          "slice1_rank": 5,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-016",
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:15+00:00",
+          "baseline_raw_score": 0.6468717673612367,
+          "slice1_raw_score": 0.6468717673612367,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 2,
+          "slice1_rank": 4,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-032",
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:31+00:00",
+          "baseline_raw_score": 0.6468717673612367,
+          "slice1_raw_score": 0.6468717673612367,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 3,
+          "slice1_rank": 3,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-036",
+          "workspace": "ai-pos",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:35+00:00",
+          "baseline_raw_score": 0.6468717673612367,
+          "slice1_raw_score": 0.6468717673612367,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 4,
+          "slice1_rank": 2,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-052",
+          "workspace": "ai-pos-app",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:51+00:00",
+          "baseline_raw_score": 0.6468717673612367,
+          "slice1_raw_score": 0.6468717673612367,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 5,
+          "slice1_rank": 1,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        }
+      ],
+      "classification": "D.BASELINE_EXPLICIT_TIEBREAK_DIFFERENCE",
+      "evidence": "baseline _tie uses valid_at ASC; Slice 1 contract uses valid_at DESC after equal raw cosine",
+      "top3_membership_change": {
+        "added_to_contract_top3": [
+          "rec-052",
+          "rec-036"
+        ],
+        "removed_from_contract_top3": [
+          "rec-012",
+          "rec-016"
+        ]
+      }
+    },
+    {
+      "query_id": "Q24",
+      "query": "N\u00e1jdi ABAP artifact link, ktor\u00fd ukazuje na README projektu ai-pos.",
+      "scope": [
+        "abap-object-exporter"
+      ],
+      "filters": {
+        "mode": "current",
+        "types": [
+          "artifact_link"
+        ],
+        "sensitive_allowed": false
+      },
+      "query_embedding_sha256": "eaee2dbc0869fc99356ce1fa76bae574764396b70d884000465b458649fafdac",
+      "baseline_top5": [
+        "rec-004",
+        "rec-024",
+        "rec-044"
+      ],
+      "slice1_top5": [
+        "rec-044",
+        "rec-024",
+        "rec-004"
+      ],
+      "candidates": [
+        {
+          "record_id": "rec-004",
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:03+00:00",
+          "baseline_raw_score": 0.5605741974849918,
+          "slice1_raw_score": 0.5605741974849918,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 1,
+          "slice1_rank": 3,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-024",
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:23+00:00",
+          "baseline_raw_score": 0.5605741974849918,
+          "slice1_raw_score": 0.5605741974849918,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 2,
+          "slice1_rank": 2,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        },
+        {
+          "record_id": "rec-044",
+          "workspace": "abap-object-exporter",
+          "type": "artifact_link",
+          "valid_at": "2026-07-10T00:00:43+00:00",
+          "baseline_raw_score": 0.5605741974849918,
+          "slice1_raw_score": 0.5605741974849918,
+          "absolute_score_delta": 0.0,
+          "baseline_rank": 3,
+          "slice1_rank": 1,
+          "projection_hash": "32124286a35bbbdaf96c3c76c90633243bb945eea5f8fa5e92083abcb5814bcf",
+          "document_embedding_sha256": "9a5461ebd3a29b7634bf20c18859c7b1321ca2ec92419a32cec68ac2b15de85a"
+        }
+      ],
+      "classification": "D.BASELINE_EXPLICIT_TIEBREAK_DIFFERENCE",
+      "evidence": "baseline _tie uses valid_at ASC; Slice 1 contract uses valid_at DESC after equal raw cosine",
+      "top3_membership_change": {
+        "added_to_contract_top3": [],
+        "removed_from_contract_top3": []
+      }
+    }
+  ],
+  "contract_quality": {
+    "top1_rate": 0.9166666666666666,
+    "top3_rate": 0.9583333333333334,
+    "multilingual_top3_rate": 1.0,
+    "historical_top3_rate": 1.0,
+    "workspace_leaks": 0,
+    "sensitive_leaks": 0,
+    "forbidden_status_leaks": 0,
+    "returned_results_top3": 57,
+    "noise_rate_top3": 0.12280701754385964,
+    "noise_status": "evaluated",
+    "unjudged_contract_top3": []
+  }
+}
