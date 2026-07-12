@@ -1,4 +1,4 @@
-import json,uuid,urllib.request
+import json,uuid,urllib.request,time
 from pathlib import Path
 from .config import BrainConfig
 from .errors import BrainError
@@ -6,6 +6,8 @@ from .models import *
 from .policy import eligible,parse_as_of
 from .ranking import rank,normalize
 from .repository import Repository
+from .audit import AuditLogger
+from .runtime import RuntimeInspector
 
 class HttpEmbeddingTransport:
     def __init__(self,config): self.config=config
@@ -20,6 +22,7 @@ class HttpEmbeddingTransport:
 class Brain:
     def __init__(self,config=None,transport=None,repository=None):
         self.config=config or BrainConfig(); self.repository=repository or Repository(self.config); self.transport=transport or HttpEmbeddingTransport(self.config)
+        self.audit=AuditLogger(self.config)
     def _request(self,**kwargs):
         # Python stdlib has UUIDv4 but no reliable UUIDv7 in supported runtimes.
         # The prefix makes this compatibility variant explicit in the contract.
@@ -44,10 +47,16 @@ class Brain:
         if sensitive and not req.sensitive_allowed: raise BrainError("BRAIN_SENSITIVE_SCOPE_DENIED","sensitive scope requires explicit permission",request_id,{"workspaces":sorted(sensitive)})
         return req
     def search(self,**kwargs):
-        req=self._request(**kwargs)
-        vector=self.transport.embed(req.query)
-        rows=[r for r in self.repository.candidates(req) if eligible(r,req)]
-        meta=self._meta()
+        started=time.perf_counter(); validation_started=started
+        try: req=self._request(**kwargs)
+        except BrainError as exc:
+            self.audit.write("search",request_id=exc.request_id,error_code=exc.code,total_latency_ms=round((time.perf_counter()-started)*1000,3));raise
+        validation_ms=(time.perf_counter()-validation_started)*1000; embedding_started=time.perf_counter()
+        try: vector=self.transport.embed(req.query)
+        except BrainError as exc:
+            self.audit.write("search",request_id=req.request_id,requested_workspaces=req.workspaces,resolved_workspaces=req.workspaces,error_code=exc.code,validation_latency_ms=round(validation_ms,3),total_latency_ms=round((time.perf_counter()-started)*1000,3));raise
+        embedding_ms=(time.perf_counter()-embedding_started)*1000; retrieval_started=time.perf_counter()
+        rows=[r for r in self.repository.candidates(req) if eligible(r,req)]; meta=self._meta()
         if self.config.embedding_dimension and len(vector)!=self.config.embedding_dimension: raise BrainError("BRAIN_MODEL_MISMATCH","query embedding dimension mismatch",req.request_id)
         try: vector=normalize(vector)
         except ValueError: raise BrainError("BRAIN_MODEL_MISMATCH","query embedding is invalid",req.request_id)
@@ -58,7 +67,9 @@ class Brain:
             event=journal.get("updated_event_id")
             if not event: raise BrainError("BRAIN_PROVENANCE_CORRUPT","source event is missing",req.request_id,{"record_id":row["record_id"]})
             title=row["title"]; results.append(SearchResult(record_id=row["record_id"],score=score,rank=n,workspace=row["workspace"],type=row["type"],sensitivity=row["sensitivity"],status=row["status"],valid_at=row["valid_at"],invalid_at=row["invalid_at"],is_current=row["status"]=="accepted" and not row["invalid_at"],title=title,snippet=title[:240],provenance=Provenance(journal_record_id=row["record_id"],source_event_id=event,projection_hash=row["projection_hash"],supersedes=journal.get("supersedes"),superseded_by=journal.get("superseded_by")),artifact_links=self.repository.related(row["record_id"]) if req.include_artifacts else [],projection_hash=row["projection_hash"],embedding_model=meta["embedding_model"],retrieval_build_id=meta["build_id"]))
-        return SearchResponse(request_id=req.request_id,retrieval_build_id=meta["build_id"],embedding_model=meta["embedding_model"],mode=req.mode,results=results)
+        response=SearchResponse(request_id=req.request_id,retrieval_build_id=meta["build_id"],embedding_model=meta["embedding_model"],mode=req.mode,stale_index=self.health().stale_index,results=results)
+        self.audit.write("search",request_id=req.request_id,requested_workspaces=req.workspaces,resolved_workspaces=req.workspaces,types=req.types,mode=req.mode,as_of=req.as_of,limit=req.limit,active_build_id=meta["build_id"],stale_flag=response.stale_index,validation_latency_ms=round(validation_ms,3),embedding_latency_ms=round(embedding_ms,3),retrieval_latency_ms=round((time.perf_counter()-retrieval_started)*1000,3),total_latency_ms=round((time.perf_counter()-started)*1000,3),result_count=len(results),returned_record_ids=[r.record_id for r in results])
+        return response
     def get_record(self,record_id,*,sensitive_allowed=False,request_id=None):
         request_id=request_id or "uuid4-compat:"+str(uuid.uuid4());row=self.repository.journal_row(record_id)
         if not row or row["status"] in {"candidate","rejected","forgotten"}: raise BrainError("BRAIN_RECORD_NOT_FOUND","record is not available",request_id)
@@ -71,13 +82,13 @@ class Brain:
     def _meta(self):
         if hasattr(self.repository,"meta"): return self.repository.meta
         con=self.repository.retrieval();raw=con.execute("SELECT value FROM retrieval_embedding_meta WHERE key='contract'").fetchone()
-        contract=json.loads(raw[0]) if raw else {};return {"build_id":"baseline","embedding_model":contract.get("fingerprint",self.config.embedding_model)}
+        contract=json.loads(raw[0]) if raw else {};return {"build_id":contract.get("build_id","baseline"),"embedding_model":contract.get("exact_model_identifier",contract.get("fingerprint",self.config.embedding_model)),"contract":contract}
     def health(self):
-        retrieval=self.config.retrieval_db_path.exists(); journal=self.config.journal_db_path.exists()
-        if not retrieval:return HealthReport(active_build_id=None,retrieval_db_available=False,journal_available=journal,indexed_document_count=None,current_document_count=None,embedding_coverage=None,embedding_model=None,per_workspace_counts={})
-        con=self.repository.retrieval(); total=con.execute("SELECT count(*) FROM retrieval_documents").fetchone()[0]; current=con.execute("SELECT count(*) FROM retrieval_documents WHERE status='accepted'").fetchone()[0]; embedded=con.execute("SELECT count(*) FROM retrieval_embeddings").fetchone()[0]
-        counts={r[0]:r[1] for r in con.execute("SELECT workspace,count(*) FROM retrieval_documents GROUP BY workspace")}
-        meta=self._meta();return HealthReport(active_build_id=meta["build_id"],retrieval_db_available=True,journal_available=journal,indexed_document_count=total,current_document_count=current,embedding_coverage=embedded/total if total else 1.0,embedding_model=meta["embedding_model"],per_workspace_counts=counts)
+        report=HealthReport(**RuntimeInspector(self.config,self._meta).inspect())
+        self.audit.write("health",active_build_id=report.active_build_id,stale_flag=report.stale_index,result_count=0)
+        return report
     def rebuild_status(self):
-        if not self.config.retrieval_db_path.exists(): return RebuildStatus(status="failed",active_build_id=None,last_known_build_metadata={})
-        return RebuildStatus(status="ready",active_build_id=self._meta()["build_id"],last_known_build_metadata=self._meta())
+        health=self.health(); meta=self._meta() if health.retrieval_db_available else {}
+        status="failed" if not health.retrieval_db_available else "rebuild_required" if health.rebuild_required else "ready"
+        result=RebuildStatus(status=status,active_build_id=health.active_build_id,current_build_id=health.active_build_id,last_known_build_metadata=meta,cursor_after=health.retrieval_cursor,last_run_finished=health.last_successful_projector_run,last_successful_validation=health.last_successful_projector_run)
+        self.audit.write("rebuild_status",active_build_id=result.active_build_id,result_count=0);return result

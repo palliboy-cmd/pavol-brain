@@ -23,6 +23,30 @@
       ],
       "title": "Current Document Count"
     },
+    "cursor_gap_events": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cursor Gap Events"
+    },
+    "embedding_count": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Count"
+    },
     "embedding_coverage": {
       "anyOf": [
         {
@@ -34,6 +58,40 @@
       ],
       "title": "Embedding Coverage"
     },
+    "embedding_dimension": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Dimension"
+    },
+    "embedding_endpoint_status": {
+      "default": "not_configured",
+      "enum": [
+        "available",
+        "unavailable",
+        "not_configured"
+      ],
+      "title": "Embedding Endpoint Status",
+      "type": "string"
+    },
+    "embedding_fingerprint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Fingerprint"
+    },
     "embedding_model": {
       "anyOf": [
         {
@@ -44,6 +102,30 @@
         }
       ],
       "title": "Embedding Model"
+    },
+    "endpoint_probe_latency_ms": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Endpoint Probe Latency Ms"
+    },
+    "index_behind": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Index Behind"
     },
     "indexed_document_count": {
       "anyOf": [
@@ -60,6 +142,66 @@
       "title": "Journal Available",
       "type": "boolean"
     },
+    "journal_head_cursor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Journal Head Cursor"
+    },
+    "last_failed_projector_run": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Failed Projector Run"
+    },
+    "last_successful_full_rebuild": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Successful Full Rebuild"
+    },
+    "last_successful_projector_run": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Successful Projector Run"
+    },
+    "oldest_unprojected_age_seconds": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Oldest Unprojected Age Seconds"
+    },
     "per_workspace_counts": {
       "additionalProperties": {
         "type": "integer"
@@ -67,9 +209,60 @@
       "title": "Per Workspace Counts",
       "type": "object"
     },
+    "projection_schema_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Projection Schema Version"
+    },
+    "rebuild_required": {
+      "default": false,
+      "title": "Rebuild Required",
+      "type": "boolean"
+    },
+    "retrieval_cursor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retrieval Cursor"
+    },
     "retrieval_db_available": {
       "title": "Retrieval Db Available",
       "type": "boolean"
+    },
+    "stale_index": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stale Index"
+    },
+    "status": {
+      "default": "unavailable",
+      "enum": [
+        "healthy",
+        "degraded",
+        "unavailable"
+      ],
+      "title": "Status",
+      "type": "string"
     }
   },
   "required": [

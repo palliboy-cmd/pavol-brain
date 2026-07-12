@@ -12,16 +12,121 @@
       ],
       "title": "Active Build Id"
     },
+    "batch_counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Batch Counts",
+      "type": "object"
+    },
+    "current_build_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Build Id"
+    },
+    "cursor_after": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cursor After"
+    },
+    "cursor_before": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cursor Before"
+    },
+    "last_error_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Error Code"
+    },
     "last_known_build_metadata": {
       "additionalProperties": true,
       "title": "Last Known Build Metadata",
       "type": "object"
     },
+    "last_run_finished": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Run Finished"
+    },
+    "last_run_started": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Run Started"
+    },
+    "last_successful_validation": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Successful Validation"
+    },
+    "previous_ready_build_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Ready Build Id"
+    },
     "status": {
       "enum": [
         "idle",
+        "running",
         "ready",
-        "failed"
+        "failed",
+        "rebuild_required"
       ],
       "title": "Status",
       "type": "string"

@@ -44,9 +44,37 @@ class HealthReport(ContractModel):
     active_build_id: str | None; retrieval_db_available: bool; journal_available: bool
     indexed_document_count: int | None; current_document_count: int | None; embedding_coverage: float | None
     embedding_model: str | None; per_workspace_counts: dict[str, int]
+    journal_head_cursor: str | None = None
+    retrieval_cursor: str | None = None
+    cursor_gap_events: int | None = None
+    oldest_unprojected_age_seconds: float | None = None
+    embedding_count: int | None = None
+    embedding_fingerprint: str | None = None
+    embedding_dimension: int | None = None
+    projection_schema_version: str | None = None
+    last_successful_projector_run: str | None = None
+    last_successful_full_rebuild: str | None = None
+    last_failed_projector_run: str | None = None
+    embedding_endpoint_status: Literal["available","unavailable","not_configured"] = "not_configured"
+    endpoint_probe_latency_ms: float | None = None
+    index_behind: bool | None = None
+    stale_index: bool | None = None
+    status: Literal["healthy","degraded","unavailable"] = "unavailable"
+    rebuild_required: bool = False
 
 class RebuildStatus(ContractModel):
-    status: Literal["idle","ready","failed"]; active_build_id: str | None; last_known_build_metadata: dict[str, Any]
+    status: Literal["idle","running","ready","failed","rebuild_required"]
+    active_build_id: str | None
+    last_known_build_metadata: dict[str, Any]
+    current_build_id: str | None = None
+    last_run_started: str | None = None
+    last_run_finished: str | None = None
+    batch_counts: dict[str, int] = Field(default_factory=dict)
+    cursor_before: str | None = None
+    cursor_after: str | None = None
+    last_error_code: str | None = None
+    last_successful_validation: str | None = None
+    previous_ready_build_id: str | None = None
 
 class BrainErrorModel(ContractModel):
     code: str; message: str; request_id: str; details: dict[str, Any] = Field(default_factory=dict)
