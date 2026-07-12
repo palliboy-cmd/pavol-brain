@@ -1,0 +1,32 @@
+{
+  "manifest_id": "artifact-validation-approved-v1",
+  "status": "APPROVED",
+  "approval": {
+    "approved_by": "Pavol",
+    "effective_at": "2026-07-12T00:00:00+02:00",
+    "source": "operator_backfill:goal-2026-07-12",
+    "basis": "Explicit human confirmation of the synthetic fixture semantics; not filesystem reachability.",
+    "review_inputs": [
+      "sqlite-spike/results/artifact-validation-gap-audit.json",
+      "sqlite-spike/results/artifact-validation-backfill-plan.json",
+      "sqlite-spike/results/artifact-validation-manual-review.json",
+      "sqlite-spike/results/artifact-validation-review-evidence.json"
+    ]
+  },
+  "decisions": [
+    {"artifact_record_id": "rec-004", "artifact_link_id": "artifact:rec-004:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-008", "artifact_link_id": "artifact:rec-008:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-012", "artifact_link_id": "artifact:rec-012:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-016", "artifact_link_id": "artifact:rec-016:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-020", "artifact_link_id": "artifact:rec-020:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-024", "artifact_link_id": "artifact:rec-024:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-028", "artifact_link_id": "artifact:rec-028:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-032", "artifact_link_id": "artifact:rec-032:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-036", "artifact_link_id": "artifact:rec-036:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-040", "artifact_link_id": "artifact:rec-040:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-044", "artifact_link_id": "artifact:rec-044:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-048", "artifact_link_id": "artifact:rec-048:touches:repo://ai-pos/missing-file.ts", "relation": "touches", "artifact_uri": "repo://ai-pos/missing-file.ts", "state": "verified_inactive", "reason_code": "wrong_target", "note": "Deliberately invalid synthetic fixture artifact. repo://ai-pos/missing-file.ts never represented a valid target."},
+    {"artifact_record_id": "rec-052", "artifact_link_id": "artifact:rec-052:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."},
+    {"artifact_record_id": "rec-056", "artifact_link_id": "artifact:rec-056:touches:repo://ai-pos/README.md", "relation": "touches", "artifact_uri": "repo://ai-pos/README.md", "state": "verified_active", "reason_code": "manual_verified", "note": "Intentional valid artifact relation in the synthetic retrieval benchmark fixture."}
+  ]
+}

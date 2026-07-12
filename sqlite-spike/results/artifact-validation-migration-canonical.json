@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-07-12T15:18:35.632832+00:00",
+  "journal_path": "spike/spike.db",
+  "mode": "apply",
+  "journal_sha256_before": "dd7218c0e55f0db53083b042e4e3b758766468c1a95617d929b91acde4899336",
+  "table_counts_before": {
+    "memory_records": 55,
+    "memory_events": 157,
+    "record_state": 55,
+    "artifact_links": 0
+  },
+  "validation_tables_before": {
+    "artifact_validation_events": false,
+    "artifact_validation_state": false
+  },
+  "canonical_table_digest_before": "1fb7108b1c0fca57a79ffda53f18a318cfa68fe6c6ffb0ff879bc47009b1ab66",
+  "backup": {
+    "path": "/Users/pavol/Backups/pavol-brain/spike-20260712T151835Z.db",
+    "integrity_check": "ok",
+    "table_counts": {
+      "memory_records": 55,
+      "memory_events": 157,
+      "record_state": 55,
+      "artifact_links": 0
+    },
+    "sha256": "4b3333b45b16030c7ae933b51640626d6f4c7c70620f5a72488511f02f9fbd50"
+  },
+  "migration": {
+    "already_applied": false,
+    "tables": [
+      "artifact_validation_events",
+      "artifact_validation_state"
+    ]
+  },
+  "state_rows_after_fold": 0,
+  "fold_mismatches": [],
+  "canonical_table_digest_after": "1fb7108b1c0fca57a79ffda53f18a318cfa68fe6c6ffb0ff879bc47009b1ab66",
+  "canonical_tables_unchanged": true,
+  "validation_tables_after": {
+    "artifact_validation_events": true,
+    "artifact_validation_state": true
+  },
+  "journal_sha256_after": "af0ec51ce08f3be35ce040ebc6a2e02a6f2b3e24af65531a23252cb482429047"
+}

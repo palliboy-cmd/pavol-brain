@@ -1,0 +1,136 @@
+{
+  "timestamp": "2026-07-12T15:18:47.612655+00:00",
+  "journal_path": "spike/spike.db",
+  "manifest_path": "sqlite-spike/results/artifact-validation-approved.json",
+  "mode": "apply",
+  "journal_sha256_before": "85432c111d4f22dd9772308d2836ec903407b8b5cab23102ff334e950394fa30",
+  "preflight_problems": [],
+  "planned_insert_count": 0,
+  "already_present_count": 14,
+  "decisions": [
+    {
+      "event_id": "ave-b4924d4f55bda3f972d6776b94be9f81",
+      "artifact_link_id": "artifact:rec-004:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-1ddf7ac76dfc1ddd00f83a4b3c4f431f",
+      "artifact_link_id": "artifact:rec-008:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-e84d6bf38bab91119a4afe1fd81910ca",
+      "artifact_link_id": "artifact:rec-012:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-d18c7fa7050ca51971b8b5ca53c21bb7",
+      "artifact_link_id": "artifact:rec-016:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-240023c7d8409c32786321eee4915cdf",
+      "artifact_link_id": "artifact:rec-020:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-8918213a8033a1d470fc3e2800602de6",
+      "artifact_link_id": "artifact:rec-024:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-2c379b2962dd06c6464b1d4697c4b77a",
+      "artifact_link_id": "artifact:rec-028:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-d4f7143c35b0203f8fd475a8474d3497",
+      "artifact_link_id": "artifact:rec-032:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-efcfce9654b02e4e0c9fac6ac3ab5cf4",
+      "artifact_link_id": "artifact:rec-036:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-bde84b2ed4a0342525b8874d8270ce40",
+      "artifact_link_id": "artifact:rec-040:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-2ccb53a1eb07c53506048defcccb0d73",
+      "artifact_link_id": "artifact:rec-044:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-c15ceb2397da45bf9fab229e88ccb63d",
+      "artifact_link_id": "artifact:rec-048:touches:repo://ai-pos/missing-file.ts",
+      "state": "verified_inactive",
+      "reason_code": "wrong_target",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-a85780a52b1bb34dbaec7477baa5702a",
+      "artifact_link_id": "artifact:rec-052:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    },
+    {
+      "event_id": "ave-553632cbd0d752f11910831607f441e3",
+      "artifact_link_id": "artifact:rec-056:touches:repo://ai-pos/README.md",
+      "state": "verified_active",
+      "reason_code": "manual_verified",
+      "already_present": true
+    }
+  ],
+  "inserted_events": 0,
+  "idempotent_noop": true,
+  "fold_mismatches": [],
+  "folded_states": {
+    "artifact:rec-004:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-008:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-012:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-016:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-020:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-024:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-028:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-032:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-036:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-040:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-044:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-048:touches:repo://ai-pos/missing-file.ts": "verified_inactive",
+    "artifact:rec-052:touches:repo://ai-pos/README.md": "verified_active",
+    "artifact:rec-056:touches:repo://ai-pos/README.md": "verified_active"
+  },
+  "state_counts": {
+    "verified_active": 13,
+    "verified_inactive": 1
+  },
+  "canonical_tables_unchanged": true,
+  "journal_sha256_after": "85432c111d4f22dd9772308d2836ec903407b8b5cab23102ff334e950394fa30",
+  "status": "OK"
+}
