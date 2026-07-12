@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "temporary_profile": "temporary-control-test",
+  "initial_state": "disabled",
+  "disabled_denial": "BRAIN_INTEGRATION_DISABLED",
+  "enabled": true,
+  "generated_config": "profile-specific custom MCP JSON with BRAIN_INTEGRATION_ID",
+  "mcp_handshake": "PASS",
+  "exact_tools": "5/5",
+  "health": "healthy",
+  "personal_search": {"status": "PASS", "returned_record_ids": ["rec-030"]},
+  "connection_test_search": {"test_call": true, "returned_record_ids": ["rec-040"]},
+  "ai_pos_denial": "BRAIN_WORKSPACE_DENIED",
+  "sensitive_denial": "BRAIN_WORKSPACE_DENIED",
+  "disabled_again_denial": "BRAIN_INTEGRATION_DISABLED",
+  "revoked": true,
+  "append_only_history_events": 5,
+  "restart_persistence": true,
+  "query_text_logged": false,
+  "brain_databases_unchanged": true
+}

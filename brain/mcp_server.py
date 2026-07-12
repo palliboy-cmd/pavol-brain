@@ -58,7 +58,9 @@ def create_server(config=None, policy=None, brain=None):
                                     sensitive_allowed=sensitive_allowed, limit=limit, include_artifacts=include_artifacts,
                                     min_score=min_score, request_id=request_id)
             policy.authorize(request.workspaces, request.sensitive_allowed, request.request_id or "",tool="brain_search")
-            return brain.search(**request.model_dump()).model_dump(mode="json")
+            result=brain.search(**request.model_dump()).model_dump(mode="json")
+            if hasattr(policy,"mark_real_call") and not config.audit_test_call:policy.mark_real_call()
+            return result
         except (BrainError, ValidationError) as exc: return _error(exc)
 
     @mcp.tool(name="brain_get_record")

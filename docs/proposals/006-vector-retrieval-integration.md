@@ -356,3 +356,9 @@ Mini-core runs one bounded, locked projector iteration every five minutes throug
 The official Python MCP SDK 1.x server uses local stdio or SSH stdio from MBP and exposes only the five approved read operations. Server profiles require explicit allowed workspaces; sensitive scope additionally requires a server-side grant, and request fields cannot self-grant it. Default consumers have only non-sensitive `ai-pos` and `personal` scope. There is no public endpoint, forwarding, tunnel, HTTP listener, or MCP write path.
 
 Hermes 0.18.2 is the real-agent acceptance PASS. Codex CLI 0.144.0 is configured but its agent smoke failed due to a missing code-mode host/client cancellation. Claude Desktop 1.20186.1 is configured but agent execution is NOT EVALUATED because no scriptable Claude CLI is installed. ChatGPT remains outside the MVP. Operational details and the four-week usage checkpoint are in `docs/operations/brain-runtime.md` and `docs/integrations/brain-mcp.md`.
+
+## Operational control plane
+
+A dedicated SQLite registry outside Git now owns integration profiles and access policy. Fixed per-agent launchers resolve enabled state, allowed tools, explicit workspaces and sensitive grants on every MCP call; identity is not request-controlled. Append-only integration events retain actor, policy hashes, changed fields, time and reason while folded rows provide current state.
+
+The private Control Center is a minimal server-rendered application bound to mini-core loopback and reached with SSH local forwarding. It combines health, projector state, configured-versus-used integrations, policy matrix, generated profile-specific configuration, connection testing, activity and the four-week value counters. Its CSRF-protected POST surface can mutate only the operational registry. Retrieval, ranking, embeddings, journal, projector cursor and the exact five read-only MCP tools remain unchanged.

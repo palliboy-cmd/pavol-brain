@@ -1,0 +1,17 @@
+{
+  "status": "PASS_WITH_HERMES_RETRY_BLOCKED",
+  "implementation": "server-rendered Python stdlib HTTP on loopback",
+  "access": "ssh -L 8765:127.0.0.1:8765 pavol@192.168.50.109 then http://127.0.0.1:8765/",
+  "listener": "127.0.0.1:8765 only",
+  "control_db": "/Users/pavol/Library/Application Support/Pavol-Brain/brain-control.db",
+  "control_db_backup": "/Users/pavol/Library/Application Support/Pavol-Brain/brain-control.db.backup.20260712T160951Z",
+  "profiles": {"hermes": "configured, prior real use PASS", "codex": "configured, prior smoke FAIL", "claude": "configured, NOT EVALUATED", "temporary-control-test": "revoked"},
+  "overview_health": "healthy",
+  "restart_persistence": "PASS",
+  "activity_privacy": "PASS; metadata and record IDs only",
+  "raw_query_absent": true,
+  "journal_sha256": "85432c111d4f22dd9772308d2836ec903407b8b5cab23102ff334e950394fa30",
+  "retrieval_sha256": "cddd6797a938111f01f3db8176fb429f6513b9372410a26003b25cd12e67e96c",
+  "brain_databases_unchanged": true,
+  "hermes": {"previous_real_call": "PASS with rec-001, rec-021, rec-041 and provenance", "post_migration_retry": "BLOCKED before tool use by hanging OpenAI Codex provider; interrupted after bounded observation"}
+}

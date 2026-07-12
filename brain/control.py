@@ -88,6 +88,8 @@ class ControlStore:
         return [dict(r) for r in con.execute(q+" ORDER BY occurred_at DESC,event_id DESC",args)]
     def mark_test(self,integration_id,success,error=None):
         p=self.get(integration_id);p.last_connection_test=now();p.last_connection_test_status="PASS" if success else "FAIL";p.last_error=error;return self.save(p,actor="connection-test",reason="automated connection test")
+    def mark_real_call(self,integration_id):
+        con=self.connect();con.execute("UPDATE integrations SET last_successful_real_call=?,updated_at=? WHERE integration_id=?",(now(),now(),integration_id));con.commit()
 
 class RegistryPolicy:
     def __init__(self,store,integration_id,audit=None):self.store,self.integration_id,self.audit=store,integration_id,audit
@@ -109,3 +111,4 @@ class RegistryPolicy:
         if denied:raise self._deny("BRAIN_WORKSPACE_DENIED","workspace is not granted",request_id,{"workspaces":sorted(denied)})
         if sensitive_allowed and not requested<=set(p.sensitive_workspace_grants):raise self._deny("BRAIN_SENSITIVE_SCOPE_DENIED","sensitive scope is not granted",request_id,{"workspaces":sorted(requested-set(p.sensitive_workspace_grants))})
         return p
+    def mark_real_call(self):self.store.mark_real_call(self.integration_id)

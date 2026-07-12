@@ -87,7 +87,7 @@ class App:
     def integrations(self):
         rows=read_activity(self.audit_path);used={r.get("client_identity") for r in rows if not r.get("test_call")}
         trs=[]
-        for p in self.store.list():trs.append(f'<tr><td><a href="/integrations/{esc(p.integration_id)}">{esc(p.display_name)}</a></td><td>{esc(p.client_type)}</td><td>{"enabled" if p.enabled else "disabled"}</td><td>{esc(p.configuration_status)}</td><td>{"used" if p.client_identity in used else "never used"}</td><td>{esc(p.transport)}</td><td>{len(p.allowed_workspaces)}</td><td>{"yes" if p.sensitive_workspace_grants else "no"}</td><td>{esc(p.last_connection_test_status)}</td></tr>')
+        for p in self.store.list():trs.append(f'<tr><td><a href="/integrations/{esc(p.integration_id)}">{esc(p.display_name)}</a></td><td>{esc(p.client_type)}</td><td>{"enabled" if p.enabled else "disabled"}</td><td>{esc(p.configuration_status)}</td><td>{"used" if p.client_identity in used or p.last_successful_real_call else "never used"}</td><td>{esc(p.transport)}</td><td>{len(p.allowed_workspaces)}</td><td>{"yes" if p.sensitive_workspace_grants else "no"}</td><td>{esc(p.last_connection_test_status)}</td></tr>')
         return self.layout("Integrations",'<table><tr><th>Name</th><th>Client</th><th>Access</th><th>Configured</th><th>Actual use</th><th>Transport</th><th>Workspaces</th><th>Sensitive</th><th>Test</th></tr>'+''.join(trs)+'</table>')
     def add_form(self):
         checks=lambda name,items:''.join(f'<label><input type="checkbox" name="{name}" value="{esc(x)}"> {esc(x)}</label> ' for x in items)
