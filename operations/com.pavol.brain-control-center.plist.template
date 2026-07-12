@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+ <key>Label</key><string>com.pavol.brain-control-center</string>
+ <key>ProgramArguments</key><array><string>__PYTHON__</string><string>__ROOT__/scripts/run_brain_control_center.py</string><string>--host</string><string>127.0.0.1</string><string>--port</string><string>8765</string></array>
+ <key>EnvironmentVariables</key><dict>
+  <key>BRAIN_JOURNAL_DB</key><string>__ROOT__/spike/spike.db</string>
+  <key>BRAIN_RETRIEVAL_DB</key><string>__ROOT__/sqlite-spike/retrieval.db</string>
+  <key>BRAIN_CONTROL_DB</key><string>__STATE__/brain-control.db</string>
+  <key>BRAIN_AUDIT_LOG</key><string>__LOGS__/audit.jsonl</string>
+ </dict>
+ <key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ProcessType</key><string>Background</string>
+ <key>StandardOutPath</key><string>__LOGS__/control-center.stdout.log</string><key>StandardErrorPath</key><string>__LOGS__/control-center.stderr.log</string>
+</dict></plist>
