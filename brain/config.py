@@ -19,3 +19,4 @@ class BrainConfig:
     audit_max_bytes: int = int(os.getenv("BRAIN_AUDIT_MAX_BYTES", "5242880"))
     audit_backup_count: int = int(os.getenv("BRAIN_AUDIT_BACKUPS", "3"))
     client_identity: str = os.getenv("BRAIN_CLIENT_IDENTITY", "local-library")
+    audit_test_call: bool = os.getenv("BRAIN_AUDIT_TEST_CALL", "false").lower() in {"1","true","yes"}

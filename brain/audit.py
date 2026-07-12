@@ -22,6 +22,6 @@ class AuditLogger:
         if not self.logger: return
         blocked = {"query", "payload", "content", "snippet", "conversation", "chain_of_thought"}
         event = {"timestamp": datetime.now(timezone.utc).isoformat(), "operation": operation,
-                 "client_identity": self.config.client_identity}
+                 "client_identity": self.config.client_identity, "test_call": self.config.audit_test_call}
         event.update({k: v for k, v in fields.items() if k not in blocked and v is not None})
         self.logger.info(json.dumps(event, ensure_ascii=False, sort_keys=True, default=str))
