@@ -1,0 +1,91 @@
+{
+  "timestamp": "2026-07-12T11:32:04.893992+00:00",
+  "python_version": "3.11.15",
+  "pydantic_version": "2.13.4",
+  "public_imports_used": [
+    "brain"
+  ],
+  "operations": {
+    "health": {
+      "pass": true,
+      "latency_ms": 0.4365839995443821
+    },
+    "current_search": {
+      "pass": true,
+      "latency_ms": 64.70445892773569
+    },
+    "cross_workspace_search": {
+      "pass": true,
+      "latency_ms": 32.37362497020513
+    },
+    "historical_search": {
+      "pass": true,
+      "latency_ms": 29.0600840235129
+    },
+    "get_record": {
+      "pass": true,
+      "latency_ms": 0.2044580178335309
+    },
+    "get_related": {
+      "pass": true,
+      "latency_ms": 0.34529203549027443
+    },
+    "validation_error": {
+      "pass": false,
+      "latency_ms": 0.018208986148238182,
+      "error": "BRAIN_FEATURE_NOT_ENABLED"
+    }
+  },
+  "failure_reasons": [],
+  "health_status": {
+    "retrieval_db_available": true,
+    "journal_available": true,
+    "active_build_id": "baseline",
+    "indexed_document_count": 51,
+    "current_document_count": 50,
+    "embedding_coverage": 1.0,
+    "embedding_model": "15d46550f6270eea40e1093f8c61eb20d78c52deebcd60106b5ed69916d2bda0"
+  },
+  "current_search": {
+    "nonempty": true,
+    "rank_order": [
+      1,
+      2,
+      3
+    ],
+    "provenance_complete": true,
+    "retrieval_build_id": "baseline",
+    "degraded": false
+  },
+  "cross_workspace": {
+    "only_requested_workspaces": true,
+    "returned_workspaces": [
+      "ai-pos",
+      "ai-pos-app"
+    ]
+  },
+  "historical_search": {
+    "superseded_returned": true
+  },
+  "get_record": {
+    "same_record_id": true,
+    "canonical_envelope": true,
+    "status": "accepted",
+    "authority": "canonical_journal_envelope"
+  },
+  "get_related": {
+    "one_hop_explicit_only": true,
+    "count": 1
+  },
+  "validation_error": {
+    "pass": true,
+    "code": "BRAIN_FEATURE_NOT_ENABLED"
+  },
+  "journal_sha256_before": "dd7218c0e55f0db53083b042e4e3b758766468c1a95617d929b91acde4899336",
+  "journal_sha256_after": "dd7218c0e55f0db53083b042e4e3b758766468c1a95617d929b91acde4899336",
+  "retrieval_sha256_before": "2024ee926461b3ef64d5bd5e9c0b0fe9399c652c9fe4482397c347f8b17a17d2",
+  "retrieval_sha256_after": "2024ee926461b3ef64d5bd5e9c0b0fe9399c652c9fe4482397c347f8b17a17d2",
+  "journal_byte_identical": true,
+  "retrieval_byte_identical": true,
+  "final_status": "PASS"
+}
