@@ -1,0 +1,706 @@
+{
+  "journal_path": "spike/spike.db",
+  "retrieval_path": "sqlite-spike/results/retrieval-slice2-validation.db",
+  "journal_hash_before": "85432c111d4f22dd9772308d2836ec903407b8b5cab23102ff334e950394fa30",
+  "journal_schema_audit": {
+    "tables": {
+      "artifact_links": [
+        {
+          "cid": 0,
+          "name": "record_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "artifact_uri",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "relation",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 3
+        },
+        {
+          "cid": 3,
+          "name": "confidence",
+          "type": "REAL",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "origin",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "verified_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "active",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "1",
+          "pk": 0
+        }
+      ],
+      "artifact_validation_events": [
+        {
+          "cid": 0,
+          "name": "event_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "artifact_link_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "artifact_record_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "artifact_uri",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "relation",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "occurred_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "effective_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "reason_code",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "actor",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "source",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "evidence",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'{}'",
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "note",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "idempotency_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "supersedes_validation_event_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "artifact_validation_state": [
+        {
+          "cid": 0,
+          "name": "artifact_link_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "artifact_record_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "current_state",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "reason_code",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "effective_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "last_event_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "validated_by",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "evidence_reference",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "graph_edges": [
+        {
+          "cid": 0,
+          "name": "edge_uuid",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "record_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "origin",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "build_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "memory_events": [
+        {
+          "cid": 0,
+          "name": "event_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "record_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "event_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "occurred_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "actor",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "data",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'{}'",
+          "pk": 0
+        }
+      ],
+      "memory_records": [
+        {
+          "cid": 0,
+          "name": "record_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "schema_version",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "1",
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "workspace",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "sensitivity",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "raw_input",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "payload",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "content_hash",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "idempotency_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "agent_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "source_assertion",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "source_excerpt",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "source_ref",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "session_ref",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "confidence",
+          "type": "REAL",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "valid_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "projection_map": [
+        {
+          "cid": 0,
+          "name": "record_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "build_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "episode_uuid",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "record_state": [
+        {
+          "cid": 0,
+          "name": "record_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "review",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "invalid_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "supersedes",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "superseded_by",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "change_reason",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "projection",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'none'",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "projection_error",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "projected_build",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "updated_event_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ]
+    },
+    "event_ordering_key": "occurred_at ASC, event_id ASC; persisted source_event_id=occurred_at\\u001fevent_id",
+    "status_action_mapping": {
+      "record_created": "initial candidate/accepted state",
+      "record_approved": "accepted",
+      "record_rejected": "rejected",
+      "record_superseded": "superseded",
+      "record_forgotten": "forgotten"
+    },
+    "event_count": 157,
+    "journal_head": "2026-07-10T11:26:18.246697+00:00\u001fevt_1ff8986752ed40fa8d22494a31d3e5d5",
+    "record_status_counts": {
+      "accepted": 51,
+      "superseded": 1,
+      "forgotten": 0,
+      "rejected": 1,
+      "candidate": 2
+    },
+    "artifact_link_count": 0
+  },
+  "run": {
+    "status": "HEALTHY",
+    "cursor_before": null,
+    "cursor_after": "2026-07-10T11:26:18.246697+00:00\u001fevt_1ff8986752ed40fa8d22494a31d3e5d5",
+    "journal_head": "2026-07-10T11:26:18.246697+00:00\u001fevt_1ff8986752ed40fa8d22494a31d3e5d5",
+    "events_seen": 157,
+    "inserted": 51,
+    "updated": 0,
+    "removed": 0,
+    "embeddings_created": 51,
+    "embeddings_reused": 0,
+    "links_added": 13,
+    "links_removed": 0,
+    "noops": 4,
+    "details": {}
+  },
+  "validation": {
+    "status": "HEALTHY",
+    "cursor": {
+      "singleton": 1,
+      "last_source_event_id": "2026-07-10T11:26:18.246697+00:00\u001fevt_1ff8986752ed40fa8d22494a31d3e5d5",
+      "last_projected_at": "2026-07-12T15:19:08.627Z",
+      "projection_schema_version": "v1",
+      "embedding_model_fingerprint": "15d46550f6270eea40e1093f8c61eb20d78c52deebcd60106b5ed69916d2bda0",
+      "embedding_dimension": 768,
+      "projector_version": "slice2-v1"
+    },
+    "journal_head": "2026-07-10T11:26:18.246697+00:00\u001fevt_1ff8986752ed40fa8d22494a31d3e5d5",
+    "issues": []
+  },
+  "journal_hash_after": "85432c111d4f22dd9772308d2836ec903407b8b5cab23102ff334e950394fa30",
+  "journal_unchanged": true,
+  "second_run": {
+    "status": "NO_CHANGES",
+    "cursor_before": "2026-07-10T11:26:18.246697+00:00\u001fevt_1ff8986752ed40fa8d22494a31d3e5d5",
+    "cursor_after": "2026-07-10T11:26:18.246697+00:00\u001fevt_1ff8986752ed40fa8d22494a31d3e5d5",
+    "journal_head": "2026-07-10T11:26:18.246697+00:00\u001fevt_1ff8986752ed40fa8d22494a31d3e5d5",
+    "events_seen": 0,
+    "inserted": 0,
+    "updated": 0,
+    "removed": 0,
+    "embeddings_created": 0,
+    "embeddings_reused": 0,
+    "links_added": 0,
+    "links_removed": 0,
+    "noops": 0,
+    "details": {}
+  },
+  "second_run_journal_unchanged": true,
+  "live_gate": {
+    "host": "mini-core",
+    "timestamp": "2026-07-12T15:20:47.025294+00:00",
+    "canonical_journal_sha256_pre_migration": "dd7218c0e55f0db53083b042e4e3b758766468c1a95617d929b91acde4899336",
+    "canonical_journal_sha256_post_migration": "af0ec51ce08f3be35ce040ebc6a2e02a6f2b3e24af65531a23252cb482429047",
+    "canonical_journal_sha256_post_backfill": "85432c111d4f22dd9772308d2836ec903407b8b5cab23102ff334e950394fa30",
+    "canonical_backup": {
+      "path": "/Users/pavol/Backups/pavol-brain/spike-20260712T151835Z.db",
+      "sha256": "4b3333b45b16030c7ae933b51640626d6f4c7c70620f5a72488511f02f9fbd50",
+      "integrity_check": "ok"
+    },
+    "active_retrieval_db_sha256_before": "2024ee926461b3ef64d5bd5e9c0b0fe9399c652c9fe4482397c347f8b17a17d2",
+    "active_retrieval_db_sha256_after": "2024ee926461b3ef64d5bd5e9c0b0fe9399c652c9fe4482397c347f8b17a17d2",
+    "active_retrieval_db_unchanged": true,
+    "validation_db": "sqlite-spike/results/retrieval-slice2-validation.db (disposable, removed after evidence capture)",
+    "indexed_documents": 51,
+    "current_documents": 50,
+    "embeddings": 51,
+    "embedding_coverage": 1.0,
+    "rec-048_excluded_from_current": true,
+    "rec-048_exclusion_authority": "canonical artifact_validation_state verified_inactive/wrong_target approved by Pavol, not filesystem reachability",
+    "document_links": {
+      "count": 13,
+      "origin": "canonical_validation"
+    },
+    "contract_parity": "24/24 (sqlite-spike/results/brain-slice2-live.json)",
+    "historical_tiebreak_mismatches": "7 queries, identical set to Slice 1 parity audit (valid_at ASC vs DESC on equal scores)",
+    "safety_leaks": {
+      "workspace": 0,
+      "sensitive": 0,
+      "forbidden_status": 0
+    },
+    "deterministic": true,
+    "provenance_complete": true,
+    "p50_ms": 32.01445902232081,
+    "p95_ms": 39.340500021353364,
+    "consumer_smoke": "PASS (active retrieval.db, read-only, byte-identical)"
+  }
+}

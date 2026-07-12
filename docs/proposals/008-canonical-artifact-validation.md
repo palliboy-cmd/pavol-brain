@@ -1,7 +1,23 @@
 # Proposal 008: Canonical artifact validation
 
-- **Status:** Draft — design only, nothing implemented
+- **Status:** Accepted and completed — migrated and backfilled on the canonical mini-core journal 2026-07-12
 - **Scope:** additive canonical-journal design required before Slice 2 can complete
+
+> **Completion note (2026-07-12).** The additive migration (`spike/schema/artifact_validation.sql`,
+> applied via `scripts/apply_artifact_validation_migration.py` after a verified SQLite backup) and the
+> approved backfill (`scripts/backfill_artifact_validation.py` over
+> `sqlite-spike/results/artifact-validation-approved.json`) are live on the canonical journal.
+> All fourteen relations were explicitly reviewed and approved by Pavol (effective
+> 2026-07-12T00:00:00+02:00): thirteen `verified_active`/`manual_verified`, and
+> `rec-048` `verified_inactive`/`wrong_target` — **because of explicit human fixture approval,
+> not because the file is missing**. Validation is relation-level (`artifact_link_id`);
+> filesystem reachability remains diagnostic only; the approval history is append-only
+> (a second backfill run inserted zero events); new artifact relations without a validation
+> judgement block projection with `REBUILD_REQUIRED` instead of being guessed.
+> Evidence: `sqlite-spike/results/artifact-validation-migration-canonical.json`,
+> `artifact-validation-backfill-report.json`, `artifact-validation-backfill-rerun.json`.
+> All acceptance criteria in §"Acceptance criteria and sequencing" were met by the Slice 2
+> live gate (`brain-slice2-projection.json`, `brain-slice2-live.json`).
 
 ## Problem and boundary
 

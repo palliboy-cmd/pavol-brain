@@ -1,0 +1,37 @@
+{
+  "scope": "mini-core live gate; disposable fixture journals and retrieval DBs only; canonical journal and active retrieval.db untouched",
+  "host": "mini-core",
+  "timestamp": "2026-07-12T15:20:47.026098+00:00",
+  "python": "3.11.15 (spike/.venv)",
+  "journal_hash_unchanged": true,
+  "failure_points": {
+    "after_batch_read": {
+      "rollback": true,
+      "cursor_unchanged": true,
+      "retry": "PASS"
+    },
+    "after_documents": {
+      "rollback": true,
+      "cursor_unchanged": true,
+      "retry": "PASS"
+    },
+    "after_embeddings": {
+      "rollback": true,
+      "cursor_unchanged": true,
+      "retry": "PASS"
+    },
+    "before_cursor_update": {
+      "rollback": true,
+      "cursor_unchanged": true,
+      "retry": "PASS"
+    },
+    "before_commit": {
+      "rollback": true,
+      "cursor_unchanged": true,
+      "retry": "PASS"
+    }
+  },
+  "evidence": "tests/test_brain_projector.py::test_failure_points_roll_back_and_retry, full suite 56/56 OK on mini-core 2026-07-12",
+  "cursor_transactionality": "cursor row is written inside the same BEGIN IMMEDIATE transaction as document/vector changes; rollback leaves cursor NULL/previous",
+  "status": "PASS"
+}
