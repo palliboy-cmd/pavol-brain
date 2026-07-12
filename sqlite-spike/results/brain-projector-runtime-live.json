@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "host": "mini-core",
+  "schedule": "LaunchAgent every 300 seconds",
+  "last_exit_code": 0,
+  "disposable_build": {"events_seen": 157, "documents": 51, "embeddings_created": 51, "validation": "HEALTHY", "contract_parity": "24/24"},
+  "second_active_run": {"status": "NO_CHANGES", "events_seen": 0, "embeddings_created": 0},
+  "journal_sha256": "85432c111d4f22dd9772308d2836ec903407b8b5cab23102ff334e950394fa30",
+  "active_retrieval_sha256": "cddd6797a938111f01f3db8176fb429f6513b9372410a26003b25cd12e67e96c",
+  "read_only_hash_check": "byte-identical",
+  "backup": "/Users/pavol/Backups/pavol-brain-20260712T154301Z/retrieval.db",
+  "backup_integrity": "ok",
+  "rollback_file": "sqlite-spike/retrieval.db.pre-slice3-20260712T154301Z"
+}

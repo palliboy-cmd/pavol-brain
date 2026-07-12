@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "transport": "SSH stdio",
+  "sdk": "mcp 1.28.1",
+  "tools": ["brain_search", "brain_get_record", "brain_get_related", "brain_health", "brain_rebuild_status"],
+  "handshake": "PASS",
+  "schema_parity": "PASS",
+  "calls": {"health": "PASS", "current_search": ["rec-041", "rec-021", "rec-001"], "two_workspace_search": ["rec-021", "rec-001", "rec-041"], "historical_search": ["rec-001", "rec-021", "rec-041"], "get_record": "PASS", "get_related": "PASS", "missing_workspace": "BRAIN_UNKNOWN_WORKSPACE", "min_score": "BRAIN_FEATURE_NOT_ENABLED", "sensitive_workspace": "BRAIN_WORKSPACE_DENIED", "rebuild_status": "ready"},
+  "provenance_complete": true,
+  "two_workspace_scope_enforced": true,
+  "audit_query_text_absent": true,
+  "journal_and_retrieval_hashes_unchanged_by_reads": true,
+  "p50_ms": 27.86,
+  "p95_ms": 77.963
+}

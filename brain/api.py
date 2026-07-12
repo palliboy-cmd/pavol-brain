@@ -71,14 +71,18 @@ class Brain:
         self.audit.write("search",request_id=req.request_id,requested_workspaces=req.workspaces,resolved_workspaces=req.workspaces,types=req.types,mode=req.mode,as_of=req.as_of,limit=req.limit,active_build_id=meta["build_id"],stale_flag=response.stale_index,validation_latency_ms=round(validation_ms,3),embedding_latency_ms=round(embedding_ms,3),retrieval_latency_ms=round((time.perf_counter()-retrieval_started)*1000,3),total_latency_ms=round((time.perf_counter()-started)*1000,3),result_count=len(results),returned_record_ids=[r.record_id for r in results])
         return response
     def get_record(self,record_id,*,sensitive_allowed=False,request_id=None):
-        request_id=request_id or "uuid4-compat:"+str(uuid.uuid4());row=self.repository.journal_row(record_id)
-        if not row or row["status"] in {"candidate","rejected","forgotten"}: raise BrainError("BRAIN_RECORD_NOT_FOUND","record is not available",request_id)
-        if row["sensitivity"]=="sensitive" and not sensitive_allowed: raise BrainError("BRAIN_SENSITIVE_SCOPE_DENIED","sensitive record requires explicit permission",request_id)
-        return RecordEnvelope(record_id=record_id,type=row["type"],workspace=row["workspace"],sensitivity=row["sensitivity"],payload=json.loads(row["payload"]),status=row["status"],valid_at=row["valid_at"],invalid_at=row["invalid_at"],supersedes=row["supersedes"],superseded_by=row["superseded_by"])
+        started=time.perf_counter();request_id=request_id or "uuid4-compat:"+str(uuid.uuid4());row=self.repository.journal_row(record_id)
+        if not row or row["status"] in {"candidate","rejected","forgotten"}:
+            self.audit.write("get_record",request_id=request_id,error_code="BRAIN_RECORD_NOT_FOUND",returned_record_ids=[]);raise BrainError("BRAIN_RECORD_NOT_FOUND","record is not available",request_id)
+        if row["sensitivity"]=="sensitive" and not sensitive_allowed:
+            self.audit.write("get_record",request_id=request_id,error_code="BRAIN_SENSITIVE_SCOPE_DENIED",returned_record_ids=[]);raise BrainError("BRAIN_SENSITIVE_SCOPE_DENIED","sensitive record requires explicit permission",request_id)
+        result=RecordEnvelope(record_id=record_id,type=row["type"],workspace=row["workspace"],sensitivity=row["sensitivity"],payload=json.loads(row["payload"]),status=row["status"],valid_at=row["valid_at"],invalid_at=row["invalid_at"],supersedes=row["supersedes"],superseded_by=row["superseded_by"])
+        self.audit.write("get_record",request_id=request_id,resolved_workspaces=[row["workspace"]],result_count=1,returned_record_ids=[record_id],total_latency_ms=round((time.perf_counter()-started)*1000,3));return result
     def get_related(self,record_id,relation_types=None,request_id=None):
         request_id=request_id or "uuid4-compat:"+str(uuid.uuid4());self.get_record(record_id,request_id=request_id); rows=self.repository.related(record_id)
         if relation_types: rows=[r for r in rows if r["relation"] in relation_types]
-        return RelatedResponse(request_id=request_id,record_id=record_id,related=rows)
+        result=RelatedResponse(request_id=request_id,record_id=record_id,related=rows)
+        self.audit.write("get_related",request_id=request_id,result_count=len(rows),returned_record_ids=[record_id]);return result
     def _meta(self):
         if hasattr(self.repository,"meta"): return self.repository.meta
         con=self.repository.retrieval();raw=con.execute("SELECT value FROM retrieval_embedding_meta WHERE key='contract'").fetchone()

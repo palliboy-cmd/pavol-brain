@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "configuration_backup": "/Users/pavol/Backups/pavol-brain-client-configs-20260712T154622Z",
+  "clients": [
+    {"client": "Hermes", "version": "0.18.2", "transport": "SSH stdio", "configuration": "~/.hermes/config.yaml", "tool_discovery": "5/5", "agent_result": "PASS", "returned_record_ids": ["rec-001", "rec-021", "rec-041"], "provenance_present": true, "sensitive_denial": "PASS"},
+    {"client": "Codex CLI", "version": "0.144.0", "transport": "SSH stdio", "configuration": "~/.codex/config.toml", "tool_discovery": "configured; direct MCP host test PASS", "agent_result": "FAIL", "evidence": "first agent run lacked codex-code-mode-host; direct-tool retry was cancelled by client", "returned_record_ids": []},
+    {"client": "Claude Desktop", "version": "1.20186.1", "transport": "SSH stdio", "configuration": "~/Library/Application Support/Claude/claude_desktop_config.json", "tool_discovery": "NOT EVALUATED", "agent_result": "NOT EVALUATED", "evidence": "desktop installed and targeted MCP config validated; no installed scriptable Claude/Claude Code CLI"}
+  ]
+}

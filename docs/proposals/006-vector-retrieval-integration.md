@@ -347,3 +347,12 @@ Only those that block implementation:
 Implement **Slice 1 only**: the `brain` Python package with `search` / `get_record` / `get_related` / `health` (static fields) over the existing baseline build — request validation, filter-then-rank exact cosine, deterministic tie-breaks, provenance-complete responses, and the acceptance tests for baseline parity, zero leaks, and determinism (§21).
 
 Not implemented yet — this document is design only.
+# Slice 3 and Slice 4 completion update (2026-07-12)
+
+Slice 3 runtime diagnostics/observability and Slice 4 read-only MCP are complete. Health now reports availability, journal/projector cursors and gap, oldest unprojected age, index and embedding counts/coverage, model fingerprint/dimension, schema version, endpoint probe/latency, workspace counts, staleness, and rebuild-required state. The index is stale only when behind and the oldest outstanding event exceeds the configurable one-hour default, or an optional event-gap threshold is exceeded.
+
+Mini-core runs one bounded, locked projector iteration every five minutes through a user LaunchAgent. The current derived index is 51 documents/51 embeddings at the 157-event journal head. It was built and validated disposably, passed 24/24 contract parity, atomically activated with rollback retained, and its second run was a zero-embedding `NO_CHANGES`.
+
+The official Python MCP SDK 1.x server uses local stdio or SSH stdio from MBP and exposes only the five approved read operations. Server profiles require explicit allowed workspaces; sensitive scope additionally requires a server-side grant, and request fields cannot self-grant it. Default consumers have only non-sensitive `ai-pos` and `personal` scope. There is no public endpoint, forwarding, tunnel, HTTP listener, or MCP write path.
+
+Hermes 0.18.2 is the real-agent acceptance PASS. Codex CLI 0.144.0 is configured but its agent smoke failed due to a missing code-mode host/client cancellation. Claude Desktop 1.20186.1 is configured but agent execution is NOT EVALUATED because no scriptable Claude CLI is installed. ChatGPT remains outside the MVP. Operational details and the four-week usage checkpoint are in `docs/operations/brain-runtime.md` and `docs/integrations/brain-mcp.md`.
