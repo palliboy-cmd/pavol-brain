@@ -1,0 +1,27 @@
+from .cursor import get_cursor
+from .errors import RebuildRequired
+
+
+def validate(con, journal_head, config):
+    issues = []
+    cursor = get_cursor(con)
+    if cursor:
+        if cursor["projection_schema_version"] != config.projection_schema_version: issues.append("projection_schema_mismatch")
+        if cursor["embedding_model_fingerprint"] != config.embedding_model_fingerprint: issues.append("embedding_model_mismatch")
+        if cursor["embedding_dimension"] != config.embedding_dimension: issues.append("embedding_dimension_mismatch")
+        if journal_head and cursor["last_source_event_id"] and cursor["last_source_event_id"] > journal_head: issues.append("cursor_ahead_of_journal")
+    checks = {
+        "orphan_embedding": "SELECT count(*) FROM retrieval_embeddings e LEFT JOIN retrieval_documents d USING(record_id) WHERE d.record_id IS NULL",
+        "document_without_embedding": "SELECT count(*) FROM retrieval_documents d LEFT JOIN retrieval_embeddings e USING(record_id) WHERE e.record_id IS NULL",
+        "forbidden_document": "SELECT count(*) FROM retrieval_documents WHERE status IN ('candidate','rejected','forgotten')",
+        "hash_mismatch": "SELECT count(*) FROM retrieval_documents d JOIN retrieval_embeddings e USING(record_id) WHERE d.projection_hash != e.projection_hash",
+    }
+    for name, query in checks.items():
+        if con.execute(query).fetchone()[0]: issues.append(name)
+    return issues
+
+
+def require_healthy(con, journal_head, config):
+    issues = validate(con, journal_head, config)
+    if issues: raise RebuildRequired(",".join(issues))
+    return issues
