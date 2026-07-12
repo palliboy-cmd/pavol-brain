@@ -1,0 +1,51 @@
+{
+  "status": "PASS",
+  "claude_desktop_version": "1.20186.1",
+  "claude_code_runtime_version": "2.1.205",
+  "application_bundle": "/Applications/Claude.app",
+  "effective_config_path": "/Users/pavol/.claude.json",
+  "legacy_config_path": "/Users/pavol/Library/Application Support/Claude/claude_desktop_config.json",
+  "config_backup": "/Users/pavol/Backups/pavol-brain-claude-repair-20260712T163350Z",
+  "root_cause": "Claude Desktop Cowork sessions use bundled Claude Code user-scope MCP configuration; the valid legacy Desktop JSON entry was not in the Cowork session MCP set",
+  "repair": "registered pavol-brain in Claude Code user scope with a fixed BRAIN_INTEGRATION_ID=claude and fully restarted Claude Desktop",
+  "transport": "SSH stdio",
+  "launcher_shape": "absolute run_brain_mcp_ssh.sh command, no arguments, fixed integration identity environment",
+  "integration_id": "claude",
+  "profile_enabled": true,
+  "allowed_workspaces": ["ai-pos", "personal"],
+  "sensitive_grants": [],
+  "mcp_initialize": "PASS",
+  "tool_discovery": {
+    "status": "PASS",
+    "count": 5,
+    "tools": ["brain_search", "brain_get_record", "brain_get_related", "brain_health", "brain_rebuild_status"]
+  },
+  "claude_startup_log": "connection requested and server launched",
+  "real_claude_desktop_search": {
+    "status": "PASS",
+    "returned_record_ids": ["rec-041", "rec-021", "rec-001"],
+    "top_record_id": "rec-041",
+    "top_source_event_id": "evt_5a6c2f85734845b19561f0267f6ce3e2",
+    "provenance_present": true,
+    "degraded": false,
+    "stale": false,
+    "control_center_activity_correlated": true
+  },
+  "real_claude_desktop_sensitive_denial": {
+    "status": "PASS",
+    "error_code": "BRAIN_WORKSPACE_DENIED",
+    "records_searched_or_returned": 0,
+    "control_center_activity_correlated": true,
+    "observed_request_id_before_fix": "",
+    "request_id_regression_fixed": true,
+    "post_fix_request_id_shape": "uuid4-compat:<uuid>"
+  },
+  "audit_identity": "claude",
+  "raw_query_absent_from_audit": true,
+  "journal_sha256_before": "85432c111d4f22dd9772308d2836ec903407b8b5cab23102ff334e950394fa30",
+  "journal_sha256_after": "85432c111d4f22dd9772308d2836ec903407b8b5cab23102ff334e950394fa30",
+  "retrieval_sha256_before": "cddd6797a938111f01f3db8176fb429f6513b9372410a26003b25cd12e67e96c",
+  "retrieval_sha256_after": "cddd6797a938111f01f3db8176fb429f6513b9372410a26003b25cd12e67e96c",
+  "brain_databases_unchanged": true,
+  "secrets_in_evidence": false
+}

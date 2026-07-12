@@ -1,5 +1,6 @@
 """Thin, read-only MCP adapter over the public Brain contract."""
 import os
+import uuid
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
@@ -54,6 +55,7 @@ def create_server(config=None, policy=None, brain=None):
                      request_id: str | None = None) -> dict:
         """Semantic retrieval using the frozen Brain search contract."""
         try:
+            request_id = request_id or "uuid4-compat:" + str(uuid.uuid4())
             request = SearchRequest(query=query, workspaces=workspaces, types=types, mode=mode, as_of=as_of,
                                     sensitive_allowed=sensitive_allowed, limit=limit, include_artifacts=include_artifacts,
                                     min_score=min_score, request_id=request_id)

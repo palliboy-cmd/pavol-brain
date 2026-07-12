@@ -116,6 +116,7 @@ def generated_config(p):
     root="/Users/pavol/Documents/Personal/Projects/pavol-brain";cmd=f"{root}/scripts/run_brain_mcp_ssh.sh";env={"BRAIN_INTEGRATION_ID":p.integration_id}
     if p.client_type=="hermes":return f"hermes mcp add {p.integration_id} --command {cmd} --env BRAIN_INTEGRATION_ID={p.integration_id}"
     if p.client_type=="codex":return f"codex mcp add {p.integration_id} --env BRAIN_INTEGRATION_ID={p.integration_id} -- {cmd}"
+    if p.client_type=="claude":return f"claude mcp add -s user {p.integration_id} -e BRAIN_INTEGRATION_ID={p.integration_id} -- {cmd}\n\n"+json.dumps({"mcpServers":{p.integration_id:{"type":"stdio","command":cmd,"args":[],"env":env}}},indent=2)
     return json.dumps({"mcpServers":{p.integration_id:{"command":cmd,"args":[],"env":env}}},indent=2)
 
 def handler(app):

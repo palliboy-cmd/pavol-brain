@@ -33,6 +33,11 @@ def test_generated_config_is_profile_specific(tmp_path):
   p=IntegrationProfile("future","Future",client,"ssh_stdio","mini",False,["personal"],[],list(TOOLS),"future")
   cfg=generated_config(p);assert "future" in cfg and "run_brain_mcp_ssh.sh" in cfg and "PRIVATE" not in cfg
 
+def test_claude_config_targets_effective_user_scoped_cowork_configuration():
+ p=IntegrationProfile("claude","Claude","claude","ssh_stdio","mini",True,["ai-pos"],[],list(TOOLS),"claude")
+ cfg=generated_config(p)
+ assert "claude mcp add -s user" in cfg and '"type": "stdio"' in cfg and "BRAIN_INTEGRATION_ID=claude" in cfg
+
 def test_csrf_post_only_and_lifecycle(tmp_path):
  a=app(tmp_path);srv=ThreadingHTTPServer(("127.0.0.1",0),handler(a));threading.Thread(target=srv.serve_forever,daemon=True).start();base=f"http://127.0.0.1:{srv.server_port}"
  try:

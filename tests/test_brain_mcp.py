@@ -45,6 +45,9 @@ def test_validation_feature_and_workspace_denials_are_structured():
     assert disabled["error"]["code"] == "BRAIN_FEATURE_NOT_ENABLED"
     denied = call(mcp, "brain_search", {"query":"x","workspaces":["sap-work"],"sensitive_allowed":True})
     assert denied["error"]["code"] == "BRAIN_WORKSPACE_DENIED"
+    assert denied["error"]["request_id"].startswith("uuid4-compat:")
+    supplied = call(mcp, "brain_search", {"query":"x","workspaces":["sap-work"],"request_id":"caller-denial-id"})
+    assert supplied["error"]["request_id"] == "caller-denial-id"
 
 
 def test_record_related_health_and_status():

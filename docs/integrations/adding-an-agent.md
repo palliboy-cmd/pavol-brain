@@ -2,7 +2,7 @@
 
 Open the Control Center through the documented SSH local forward and choose **Add integration**. Select `custom_mcp` for any generic MCP client, give it a stable lowercase ID, select local or SSH stdio, explicitly select workspaces and tools, leave sensitive grants empty unless separately approved, and create it disabled.
 
-The detail page generates a profile-specific Hermes command, Codex command, or Claude/custom JSON fragment. Copy only that fragment into the client. The launcher supplies `BRAIN_INTEGRATION_ID`; agent requests cannot choose identity. Start with the profile disabled, inspect the generated configuration, explicitly enable it, then run the connection test.
+The detail page generates a profile-specific Hermes command, Codex command, Claude user-scoped registration command plus JSON, or custom JSON fragment. Claude Desktop 1.20186.1 Cowork sessions use the bundled Claude Code configuration in `~/.claude.json`; the legacy `claude_desktop_config.json` entry alone is not effective for those sessions. Copy only the generated registration for the intended client. The launcher supplies `BRAIN_INTEGRATION_ID`; agent requests cannot choose identity. Start with the profile disabled, inspect the generated configuration, explicitly enable it, then run the connection test.
 
 The test performs a real MCP handshake, verifies the exact five tools, health, an allowed search, ungranted and sensitive denial, provenance, audit identity, and byte-identical journal/retrieval DBs. Its calls carry `test_call=true` and are excluded from real-use metrics.
 
