@@ -3,21 +3,21 @@
 - **Status:** Draft — design only, nothing implemented
 - **Date:** 2026-07-12
 - **Follows:** [Proposal 002](002-pavol-brain-shared-memory-and-knowledge-graph.md), [Proposal 003](003-graphiti-spike-design.md), [Proposal 004](004-graphiti-spike-architecture-review.md), [Proposal 005](005-sqlite-fts5-embeddings-retrieval-baseline.md)
-- **Decision inputs:** `spike/DECISION.md` (Graphiti NO), `sqlite-spike/DECISION.md` (GO WITH CONDITIONS — vector-only)
+- **Decision inputs:** `spike/DECISION.md` (**NO for the tested local Graphiti 0.29.2 + structured-output stack; graph retrieval quality was not evaluated.**), `sqlite-spike/DECISION.md` (GO WITH CONDITIONS — vector-only)
 
 ---
 
 ## 1. Executive summary
 
-The Graphiti spike ended NO. The SQLite retrieval baseline ended **GO WITH CONDITIONS — vector-only**: FTS-only missed the top-3 gate (70.83%), hybrid RRF passed but scored below vector-only (95.83% vs 100% top-3) and is not used. Vector-only achieved 91.67% top-1, 100% top-3, zero workspace/sensitive/status leaks, p95 under 31 ms, and 51/51 embedding coverage. A/B rebuild equivalence and the active-build switch both passed; S4 noise failed at 10.53% (threshold ≤10%), which is why the verdict carries conditions rather than a plain GO.
+**NO for the tested local Graphiti 0.29.2 + structured-output stack; graph retrieval quality was not evaluated.** The SQLite retrieval baseline ended **GO WITH CONDITIONS — vector-only**: FTS-only missed the top-3 gate (70.83%), hybrid RRF passed but scored below vector-only (95.83% vs 100% top-3) and is not used. Vector-only achieved 91.67% top-1, 100% top-3, zero workspace/sensitive/status leaks, p95 under 31 ms, and 51/51 embedding coverage. A/B rebuild equivalence and the active-build switch both passed; S4 noise failed at 10.53% (threshold ≤10%), which is why the verdict carries conditions rather than a plain GO.
 
 This proposal defines the integration layer on top of that result:
 
-- **Backend:** SQLite + local embeddings (`nomic-embed-text:latest` via an Ollama-compatible endpoint) + exact cosine over the full eligible candidate set.
+- **Backend:** SQLite + local embeddings + exact cosine over the full eligible candidate set. `nomic-embed-text:latest` is the provisional spike baseline, not the final model decision.
 - **Canonical truth** remains the append-only SQLite journal (`memory_records`, `record_state`, `artifact_links`). The retrieval index is a derived, disposable, rebuildable projection and never becomes authoritative.
 - **Vector-only is the primary and only ranked route.** FTS5 remains a diagnostic/explicitly-requested fallback route and never silently substitutes for vector search.
-- **Hybrid RRF is not used** and must not be re-enabled without a new benchmark decision.
-- Agents (Hermes, Codex, Claude, ChatGPT, future ones) consume retrieval through a single small contract — `brain.search`, `brain.get_record`, `brain.get_related`, `brain.health`, `brain.rebuild_status` — with no knowledge of the SQLite schema, the embedding endpoint, or the build lifecycle.
+- **Hybrid RRF is not used** in the MVP API. Existing hybrid code remains benchmark-only and is re-evaluated in Slice 5 on a new dataset; no RRF weights may be tuned on the existing 24 queries, and re-measurement does not automatically enable hybrid.
+- Hermes, Codex, and Claude consume retrieval through a single small transport-neutral contract — `brain.search`, `brain.get_record`, `brain.get_related`, `brain.health`, `brain.rebuild_status` — with no knowledge of the SQLite schema, the embedding endpoint, or the build lifecycle. ChatGPT is not an MVP consumer.
 
 Production use stays gated behind the carried-over conditions in §22: expanded benchmark, re-measured noise rate on an independent set, no tuning against the current 24 queries, and a strictly read-only retrieval API.
 
@@ -84,10 +84,14 @@ Contract rules:
 | `sensitive_allowed` | bool | `false` | must be `true` to include any sensitive-workspace scope; `false` + sensitive workspace in `workspaces` → validation error, not silent filtering |
 | `limit` | int | `10` | 1–50; values above 50 rejected, not clamped, so callers notice |
 | `include_artifacts` | bool | `true` | when `false`, `artifact_links` arrays are omitted from results (cheaper payload) |
-| `min_score` | float | `null` (off) | if provided: 0.0–1.0. Permitted in the schema, but **no default threshold ships in MVP** — choosing a value against the current 24 queries would violate condition 5 of the spike verdict. |
+| `min_score` | float | `null` | Reserved for a future schema. **Before Slice 5, every non-null value is rejected with structured error `BRAIN_FEATURE_NOT_ENABLED`; no threshold is applied.** This technically prevents tuning against the existing 24 queries. |
 | `request_id` | string | auto-generated UUIDv7 | caller-supplied trace ID propagated to audit log and response |
 
 Validation is fail-fast and total: an invalid request returns a structured error and touches neither the embedding endpoint nor the index.
+
+## 5.1 Transport-neutral contract schemas
+
+Slice 1 fixes both the Python models and transport-neutral JSON Schemas for `SearchRequest`, `SearchResponse`, `RecordEnvelope`, `RelatedResponse`, `HealthReport`, `RebuildStatus`, and structured errors (including `code`, `message`, and field-level validation details). They are **one contract**, generated from or checked against the same source; tests must fail on any divergence. Slice 4's MCP server maps these schemas 1:1 and must not change field semantics, defaults, or validation rules.
 
 ## 6. Search response schema
 
@@ -95,7 +99,7 @@ Validation is fail-fast and total: an invalid request returns a structured error
 {
   "request_id": "0197f3a2-…",
   "retrieval_build_id": "build-2026-07-11T21:04:12Z-a3f9",
-  "embedding_model": "nomic-embed-text:latest@sha256:…",   // model fingerprint
+  "embedding_model": "model-name@sha256:…",   // required model fingerprint, not a fixed model name
   "mode": "current",
   "degraded": false,          // true only for the explicit FTS fallback route (§19)
   "results": [
@@ -123,7 +127,7 @@ Validation is fail-fast and total: an invalid request returns a structured error
         {"relation": "implements", "uri": "git://ai-pos@8c2f6e3", "link_record_id": "rec-032"}
       ],
       "projection_hash": "ph-9c41…",
-      "embedding_model": "nomic-embed-text:latest@sha256:…",
+      "embedding_model": "model-name@sha256:…",
       "retrieval_build_id": "build-2026-07-11T21:04:12Z-a3f9"
     }
   ]
@@ -163,7 +167,7 @@ Hard rule: **a result without provenance is invalid.** The layer must refuse to 
 
 - Every result resolves back to exactly one canonical journal record: `record_id` + `source_event_id` + `projection_hash` reproduce the indexed document from the journal deterministically.
 - **Artifact links are explicit typed links** from `artifact_links` (relation + normalized URI + the link's own record ID). The retrieval layer transports them; it never creates, infers, or ranks them.
-- **No model-invented relation edges** — the Graphiti NO decision stands; relatedness exists only where the journal wrote it.
+- **No model-invented relation edges** — **NO for the tested local Graphiti 0.29.2 + structured-output stack; graph retrieval quality was not evaluated.** Relatedness here exists only where the journal wrote it.
 - Recommended representation (as in §6): artifact links nested inside each result under `artifact_links`, and provenance as a dedicated `provenance` object rather than flattened top-level fields, so agents can pass the provenance block through to citations verbatim.
 
 ## 11. Incremental indexing
@@ -195,7 +199,7 @@ Carried directly from the baseline, where A/B equivalence and switching passed:
 MVP topology, deliberately boring:
 
 - **mini-core is the primary retrieval host.** The projector, the retrieval library, and the active `retrieval.db` all live there.
-- **Embeddings** come from a local Ollama-compatible endpoint on mini-core (`nomic-embed-text:latest`), loopback only.
+- **Embeddings** come from a local Ollama/MLX-compatible endpoint on mini-core, loopback only. The runtime contract is model-name agnostic and always records a mandatory model fingerprint; `nomic-embed-text:latest` is only the provisional spike baseline.
 - **`retrieval.db` is local disk on mini-core** — never on a network share; SQLite over NFS/SMB is a corruption risk.
 - **NAS is backup only:** periodic snapshots of the canonical journal (the thing that matters) and optionally the active build (a convenience — builds are rebuildable).
 - **MBP** is a future dev/offline candidate: it would run its own rebuild from a journal copy, never sync `retrieval.db` files, and never write back.
@@ -207,12 +211,12 @@ MVP topology, deliberately boring:
 |---|---|---|
 | **Python library** | Zero deployment; contract = typed function signatures; trivially testable; no auth surface; matches "thin layer, low maintenance" | Only in-process Python callers; each consumer process needs the package and local DB access |
 | **Local CLI** | Universal (anything that can exec); scriptable; trivial wrapper over the library | Per-call process + model-handshake overhead; JSON-over-stdout contract is easy to drift; weak typing |
-| **MCP server** | Native for Claude/Codex/Hermes-style agents and increasingly ChatGPT; tools map 1:1 onto `brain.*`; read-only tools are a natural fit | A running process to manage; MCP spec churn; still needs the library underneath |
+| **MCP server** | Native for Hermes/Codex/Claude-style agents; tools map 1:1 onto `brain.*`; read-only tools are a natural fit | A running process to manage; MCP spec churn; still needs the library underneath |
 | **Small HTTP service** | Universal transport; language-agnostic | Pulls in the server framework, auth, and hardening this phase explicitly excludes (§3); most maintenance for least MVP benefit |
 
 **Recommendation: Python library first (`brain` package) as the canonical contract, with a thin MCP server as the single agent-facing adapter in Slice 4.**
 
-Rationale: the library *is* the contract — every other form is a serializer around it, so building it first means the CLI/MCP/HTTP question never changes the semantics. It carries zero operational surface while the GO conditions (expanded benchmark, noise re-measurement) are still open, which is the correct posture for a system not yet cleared for production. When agents outside a Python process need access, MCP is the one adapter that covers Hermes, Codex, Claude, and ChatGPT with a single implementation; HTTP is deferred until a concrete non-MCP consumer exists, and the CLI is an optional 50-line wrapper for humans, not an integration target.
+Rationale: the library *is* the contract — every other form is a serializer around it, so building it first means the CLI/MCP/HTTP question never changes the semantics. It carries zero operational surface while the GO conditions are still open. MCP covers the MVP consumers Hermes, Codex, and Claude; HTTP is deferred until a concrete non-MCP consumer exists.
 
 ## 15. Agent integration
 
@@ -221,7 +225,7 @@ All agents call the same contract, differing only in transport:
 - **Hermes** (mini-core resident): imports the `brain` library directly in-process — the lowest-latency path — or uses the local MCP server once Slice 4 lands, whichever matches its runtime.
 - **Codex:** MCP client → `brain_search` / `brain_get_record` / `brain_health` tools exposed by the Slice-4 MCP server.
 - **Claude (Claude Code / agents):** same MCP server, registered as a local stdio or loopback server.
-- **ChatGPT:** MCP connector against the same server; until ChatGPT can reach mini-core, it simply has no brain access — no bespoke side channel.
+- **ChatGPT:** not an MVP consumer. Any future integration requires a separate security/topology decision; this proposal designs no public endpoint, tunnel, remote authentication, or side channel.
 
 Every transport maps to the identical request/response schemas of §5–§6; the MCP tool descriptions state that `workspaces` is mandatory and results carry provenance that must be cited, not paraphrased away.
 
@@ -284,8 +288,8 @@ Per request, the audit log records: `request_id`, timestamp, operation, requeste
 1. **Slice 1 — library contract + read-only search:** `brain` Python package implementing §4–§10 over the existing baseline build; validation, ranking, provenance, and the leak invariant under test. No projector changes.
 2. **Slice 2 — incremental projection:** journal cursor, projection-hash reuse, embedding cache, supersede/forget invalidation, idempotent replay (§11).
 3. **Slice 3 — health/status:** `brain.health()` and `brain.rebuild_status()` (§16), staleness detection, fingerprint checks.
-4. **Slice 4 — MCP adapter:** thin MCP server exposing the five operations as read-only tools on loopback/stdio; Hermes/Codex/Claude/ChatGPT wiring.
-5. **Slice 5 — extended benchmark:** independent query set beyond the 24, noise-rate re-measurement, per the carried conditions (§22). No tuning against the old set.
+4. **Slice 4 — MCP adapter:** thin MCP server exposing the fixed Slice-1 schemas 1:1 as read-only loopback/stdio tools for Hermes/Codex/Claude. It must not alter fields, semantics, defaults, or validation.
+5. **Slice 5 — extended benchmark and model bake-off:** at least 100 new semantic queries; predeclared quotas for Slovak, English, multilingual/paraphrase, technical jargon, identifiers/artifact paths, historical/current, and sensitive/cross-workspace policy cases; and roughly 10× distractor corpus relative to the original corpus. Gates require a minimum sample size and confidence-interval reporting; a boundary result from one sample is not reliable evidence that a gate is crossed. No tuning against the old set. Candidate list (proposal, not commitment): nomic-embed-text v1 baseline, Nomic Embed V2, BGE-M3, and a suitable local Qwen embedding variant. Before implementation, verify availability, license, RAM/disk needs, Ollama/MLX compatibility, multilingual performance, and dimensions.
 6. **Slice 6 — production readiness review:** conditions checklist, security pass on the adapter, retention/backup verification, and the GO/NO decision to drop "WITH CONDITIONS."
 
 Each slice is independently shippable and reviewable; Slices 5–6 gate the production label, not the earlier slices' merging.
@@ -306,11 +310,11 @@ Each slice is independently shippable and reviewable; Slices 5–6 gate the prod
 
 Explicitly restated from `sqlite-spike/DECISION.md`; this proposal does not weaken any of them:
 
-1. **Vector-only is the selected route.** Exact cosine over local `nomic-embed-text:latest` embeddings.
-2. **Hybrid RRF is disabled** and absent from the API; re-enabling requires a new benchmarked decision.
+1. **Vector-only is the selected route.** Exact cosine over local embeddings; the concrete model remains provisional and the fingerprint is mandatory.
+2. **Hybrid RRF is disabled** and absent from the API; existing code is benchmark-only, is re-measured in Slice 5, and is not automatically enabled by that measurement.
 3. **The benchmark must be expanded** beyond the 24 queries before any production label (Slice 5).
 4. **Noise rate must be re-verified on an independent set** — S4 failed at 10.53% against the ≤10% gate; the retest happens on new queries, not a re-scored old set.
-5. **No tuning** of ranking, thresholds (including `min_score`), or allow-lists against the existing 24 scored queries.
+5. **No tuning** of ranking, thresholds, or allow-lists against the existing 24 scored queries. `min_score` is technically disabled pre-Slice-5: any non-null request value returns `BRAIN_FEATURE_NOT_ENABLED`.
 6. **Provenance with every result** and **no mutations through retrieval** are structural properties of this design (§6, §4), not optional behaviors.
 7. **The "production" label** is granted only at Slice 6, after conditions 3–4 pass.
 
