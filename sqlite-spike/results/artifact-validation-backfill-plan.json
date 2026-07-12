@@ -1,0 +1,22 @@
+{
+  "status": "PLAN_ONLY",
+  "source": "artifact-validation-gap-audit.json",
+  "write_authorization": "none",
+  "approval_required": true,
+  "items": [
+    {"artifact_record_id":"rec-004","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-008","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-012","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-016","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-020","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-024","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-028","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-032","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-036","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-040","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-044","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-048","suggested_state":"unknown","suggested_reason":"other","evidence":"fixture-only exclusion; target checkout inaccessible; reviewer must decide wrong_target vs corrected relation","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-052","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null},
+    {"artifact_record_id":"rec-056","suggested_state":"unknown","suggested_reason":"migrated_from_baseline_review","evidence":"baseline included; no canonical validation event","confidence":"low","approved":null}
+  ]
+}
