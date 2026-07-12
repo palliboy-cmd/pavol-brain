@@ -1,0 +1,42 @@
+import json,sqlite3
+from pathlib import Path
+from .errors import BrainError
+
+class Repository:
+    def __init__(self,config): self.config=config
+    def _readonly(self,path,code,message):
+        path=Path(path)
+        if not path.is_file(): raise BrainError(code,message,"")
+        try:
+            con=sqlite3.connect(path.resolve().as_uri()+"?mode=ro",uri=True)
+            con.row_factory=sqlite3.Row
+            con.execute("PRAGMA query_only=ON")
+            return con
+        except sqlite3.Error as exc: raise BrainError(code,message,"",{"reason":type(exc).__name__}) from exc
+    def retrieval(self):
+        return self._readonly(self.config.retrieval_db_path,"BRAIN_INDEX_UNAVAILABLE","retrieval database is unavailable")
+    def journal(self):
+        return self._readonly(self.config.journal_db_path,"BRAIN_INDEX_UNAVAILABLE","canonical journal is unavailable")
+    def workspaces(self):
+        return {r[0] for r in self.retrieval().execute("SELECT DISTINCT workspace FROM retrieval_documents")}
+    def sensitive_workspaces(self,workspaces):
+        marks=",".join("?"*len(workspaces))
+        return {r[0] for r in self.retrieval().execute(f"SELECT DISTINCT workspace FROM retrieval_documents WHERE workspace IN ({marks}) AND sensitivity='sensitive'",workspaces)}
+    def candidates(self,request):
+        con=self.retrieval(); states=["accepted"] if request.mode=="current" else ["accepted","superseded"]
+        ws=",".join("?"*len(request.workspaces));ty=",".join("?"*len(request.types or ["decision","outcome","fact","preference","artifact_link","correction"]));st=",".join("?"*len(states))
+        sql=f"""SELECT d.*,e.vector,e.dimensions FROM retrieval_documents d JOIN retrieval_embeddings e USING(record_id)
+        WHERE d.workspace IN ({ws}) AND d.type IN ({ty}) AND d.status IN ({st}) AND (? OR d.sensitivity='normal')"""
+        return [dict(r) for r in con.execute(sql,[*request.workspaces,*(request.types or ["decision","outcome","fact","preference","artifact_link","correction"]),*states,1 if request.sensitive_allowed else 0])]
+    def journal_row(self,record_id):
+        con=self.journal()
+        row=con.execute("SELECT r.*,s.status,s.invalid_at,s.supersedes,s.superseded_by,s.updated_event_id FROM memory_records r JOIN record_state s USING(record_id) WHERE r.record_id=?",(record_id,)).fetchone()
+        return dict(row) if row else None
+    def related(self,record_id):
+        con=self.journal();out=[]
+        for r in con.execute("SELECT relation,artifact_uri,record_id FROM artifact_links WHERE record_id=?",(record_id,)): out.append(dict(r))
+        row=con.execute("SELECT supersedes,superseded_by FROM record_state WHERE record_id=?",(record_id,)).fetchone()
+        if row:
+            for kind,target in (("supersedes",row["supersedes"]),("superseded_by",row["superseded_by"])):
+                if target: out.append({"relation":kind,"record_id":target})
+        return out

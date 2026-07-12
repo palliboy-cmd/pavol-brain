@@ -1,3 +1,4 @@
 graphiti-core==0.29.2
 falkordb==1.4.0
 PyYAML==6.0.2
+pydantic>=2,<3

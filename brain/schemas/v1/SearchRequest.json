@@ -1,0 +1,107 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "as_of": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "As Of"
+    },
+    "include_artifacts": {
+      "default": true,
+      "title": "Include Artifacts",
+      "type": "boolean"
+    },
+    "limit": {
+      "default": 10,
+      "maximum": 50,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "min_score": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Min Score"
+    },
+    "mode": {
+      "default": "current",
+      "enum": [
+        "current",
+        "historical"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "query": {
+      "title": "Query",
+      "type": "string"
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Request Id"
+    },
+    "sensitive_allowed": {
+      "default": false,
+      "title": "Sensitive Allowed",
+      "type": "boolean"
+    },
+    "types": {
+      "anyOf": [
+        {
+          "items": {
+            "enum": [
+              "decision",
+              "outcome",
+              "fact",
+              "preference",
+              "artifact_link",
+              "correction"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Types"
+    },
+    "workspaces": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Workspaces",
+      "type": "array"
+    }
+  },
+  "required": [
+    "query",
+    "workspaces"
+  ],
+  "title": "SearchRequest",
+  "type": "object"
+}

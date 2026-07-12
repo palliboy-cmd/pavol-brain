@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "active_build_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Active Build Id"
+    },
+    "last_known_build_metadata": {
+      "additionalProperties": true,
+      "title": "Last Known Build Metadata",
+      "type": "object"
+    },
+    "status": {
+      "enum": [
+        "idle",
+        "ready",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "active_build_id",
+    "last_known_build_metadata"
+  ],
+  "title": "RebuildStatus",
+  "type": "object"
+}

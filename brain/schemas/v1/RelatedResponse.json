@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "record_id": {
+      "title": "Record Id",
+      "type": "string"
+    },
+    "related": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Related",
+      "type": "array"
+    },
+    "request_id": {
+      "title": "Request Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "request_id",
+    "record_id",
+    "related"
+  ],
+  "title": "RelatedResponse",
+  "type": "object"
+}

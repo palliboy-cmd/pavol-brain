@@ -1,0 +1,81 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "invalid_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Invalid At"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "record_id": {
+      "title": "Record Id",
+      "type": "string"
+    },
+    "sensitivity": {
+      "title": "Sensitivity",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "superseded_by": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Superseded By"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes"
+    },
+    "type": {
+      "title": "Type",
+      "type": "string"
+    },
+    "valid_at": {
+      "title": "Valid At",
+      "type": "string"
+    },
+    "workspace": {
+      "title": "Workspace",
+      "type": "string"
+    }
+  },
+  "required": [
+    "record_id",
+    "type",
+    "workspace",
+    "sensitivity",
+    "payload",
+    "status",
+    "valid_at"
+  ],
+  "title": "RecordEnvelope",
+  "type": "object"
+}

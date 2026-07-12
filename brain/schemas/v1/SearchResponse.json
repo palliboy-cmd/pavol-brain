@@ -1,0 +1,208 @@
+{
+  "$defs": {
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "journal_record_id": {
+          "title": "Journal Record Id",
+          "type": "string"
+        },
+        "projection_hash": {
+          "title": "Projection Hash",
+          "type": "string"
+        },
+        "source_event_id": {
+          "title": "Source Event Id",
+          "type": "string"
+        },
+        "superseded_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Superseded By"
+        },
+        "supersedes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Supersedes"
+        }
+      },
+      "required": [
+        "journal_record_id",
+        "source_event_id",
+        "projection_hash"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "SearchResult": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_links": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Artifact Links",
+          "type": "array"
+        },
+        "embedding_model": {
+          "title": "Embedding Model",
+          "type": "string"
+        },
+        "invalid_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invalid At"
+        },
+        "is_current": {
+          "title": "Is Current",
+          "type": "boolean"
+        },
+        "projection_hash": {
+          "title": "Projection Hash",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "rank": {
+          "title": "Rank",
+          "type": "integer"
+        },
+        "record_id": {
+          "title": "Record Id",
+          "type": "string"
+        },
+        "retrieval_build_id": {
+          "title": "Retrieval Build Id",
+          "type": "string"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        },
+        "sensitivity": {
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "snippet": {
+          "title": "Snippet",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_at": {
+          "title": "Valid At",
+          "type": "string"
+        },
+        "workspace": {
+          "title": "Workspace",
+          "type": "string"
+        }
+      },
+      "required": [
+        "record_id",
+        "score",
+        "rank",
+        "workspace",
+        "type",
+        "sensitivity",
+        "status",
+        "valid_at",
+        "is_current",
+        "title",
+        "snippet",
+        "provenance",
+        "artifact_links",
+        "projection_hash",
+        "embedding_model",
+        "retrieval_build_id"
+      ],
+      "title": "SearchResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "degraded": {
+      "default": false,
+      "title": "Degraded",
+      "type": "boolean"
+    },
+    "embedding_model": {
+      "title": "Embedding Model",
+      "type": "string"
+    },
+    "mode": {
+      "title": "Mode",
+      "type": "string"
+    },
+    "request_id": {
+      "title": "Request Id",
+      "type": "string"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/SearchResult"
+      },
+      "title": "Results",
+      "type": "array"
+    },
+    "retrieval_build_id": {
+      "title": "Retrieval Build Id",
+      "type": "string"
+    },
+    "stale_index": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stale Index"
+    }
+  },
+  "required": [
+    "request_id",
+    "retrieval_build_id",
+    "embedding_model",
+    "mode",
+    "results"
+  ],
+  "title": "SearchResponse",
+  "type": "object"
+}

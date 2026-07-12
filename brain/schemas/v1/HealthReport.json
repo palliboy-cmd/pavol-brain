@@ -1,0 +1,87 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "active_build_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Active Build Id"
+    },
+    "current_document_count": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Current Document Count"
+    },
+    "embedding_coverage": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Embedding Coverage"
+    },
+    "embedding_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Embedding Model"
+    },
+    "indexed_document_count": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Indexed Document Count"
+    },
+    "journal_available": {
+      "title": "Journal Available",
+      "type": "boolean"
+    },
+    "per_workspace_counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Per Workspace Counts",
+      "type": "object"
+    },
+    "retrieval_db_available": {
+      "title": "Retrieval Db Available",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "active_build_id",
+    "retrieval_db_available",
+    "journal_available",
+    "indexed_document_count",
+    "current_document_count",
+    "embedding_coverage",
+    "embedding_model",
+    "per_workspace_counts"
+  ],
+  "title": "HealthReport",
+  "type": "object"
+}
