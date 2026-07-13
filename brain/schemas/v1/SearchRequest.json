@@ -72,6 +72,8 @@
         {
           "items": {
             "enum": [
+              "problem",
+              "analysis",
               "decision",
               "outcome",
               "fact",
@@ -91,16 +93,23 @@
       "title": "Types"
     },
     "workspaces": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Workspaces",
-      "type": "array"
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workspaces"
     }
   },
   "required": [
-    "query",
-    "workspaces"
+    "query"
   ],
   "title": "SearchRequest",
   "type": "object"

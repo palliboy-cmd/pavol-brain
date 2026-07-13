@@ -1,0 +1,216 @@
+{
+  "$defs": {
+    "RecordLink": {
+      "additionalProperties": false,
+      "properties": {
+        "relation": {
+          "enum": [
+            "addresses",
+            "analyzes",
+            "decides",
+            "implements",
+            "results_in",
+            "caused_by"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "target_record_id": {
+          "title": "Target Record Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_record_id",
+        "relation"
+      ],
+      "title": "RecordLink",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "change_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Change Reason"
+    },
+    "changes": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Changes",
+      "type": "array"
+    },
+    "commit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Commit"
+    },
+    "idempotency_key": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Idempotency Key"
+    },
+    "links": {
+      "items": {
+        "$ref": "#/$defs/RecordLink"
+      },
+      "title": "Links",
+      "type": "array"
+    },
+    "open_questions": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Open Questions",
+      "type": "array"
+    },
+    "sensitivity": {
+      "default": "normal",
+      "enum": [
+        "normal",
+        "sensitive"
+      ],
+      "title": "Sensitivity",
+      "type": "string"
+    },
+    "session_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Ref"
+    },
+    "source_assertion": {
+      "default": "agent_inference",
+      "enum": [
+        "explicit_user_command",
+        "explicit_user_confirmation",
+        "verified_tool_result",
+        "authoritative_document",
+        "agent_inference",
+        "imported_curated"
+      ],
+      "title": "Source Assertion",
+      "type": "string"
+    },
+    "source_excerpt": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Excerpt"
+    },
+    "source_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Ref"
+    },
+    "summary": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes"
+    },
+    "valid_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Valid At"
+    },
+    "verification": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Verification",
+      "type": "object"
+    },
+    "workspace": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workspace"
+    }
+  },
+  "required": [
+    "summary"
+  ],
+  "title": "OutcomeRequest",
+  "type": "object"
+}

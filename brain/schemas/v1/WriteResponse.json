@@ -1,0 +1,83 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "idempotent": {
+      "title": "Idempotent",
+      "type": "boolean"
+    },
+    "policy_band": {
+      "enum": [
+        "A",
+        "B"
+      ],
+      "title": "Policy Band",
+      "type": "string"
+    },
+    "projection_pending": {
+      "default": true,
+      "title": "Projection Pending",
+      "type": "boolean"
+    },
+    "record_id": {
+      "title": "Record Id",
+      "type": "string"
+    },
+    "request_id": {
+      "title": "Request Id",
+      "type": "string"
+    },
+    "review": {
+      "enum": [
+        "auto_accepted",
+        "human_approved",
+        "pending"
+      ],
+      "title": "Review",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "accepted",
+        "candidate"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "problem",
+        "analysis",
+        "decision",
+        "outcome"
+      ],
+      "title": "Type",
+      "type": "string"
+    },
+    "workspace": {
+      "title": "Workspace",
+      "type": "string"
+    }
+  },
+  "required": [
+    "request_id",
+    "record_id",
+    "event_id",
+    "type",
+    "workspace",
+    "status",
+    "review",
+    "policy_band",
+    "idempotent",
+    "created_at"
+  ],
+  "title": "WriteResponse",
+  "type": "object"
+}

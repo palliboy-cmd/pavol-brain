@@ -14,7 +14,7 @@ def fold(events):
     s={'status':'candidate','review':'pending','projection':'none','invalid_at':None,'supersedes':None,'superseded_by':None,'change_reason':None,'projection_error':None,'projected_build':None,'updated_event_id':None}
     for e in events:
         d=json.loads(e['data']); t=e['event_type']; s['updated_event_id']=e['event_id']
-        if t=='record_created': s.update(status=d['status'],review=d['review'])
+        if t=='record_created': s.update(status=d['status'],review=d['review'],supersedes=d.get('supersedes'),change_reason=d.get('change_reason'))
         elif t=='record_approved': s.update(status='accepted',review='human_approved')
         elif t=='record_rejected': s.update(status='rejected',review='rejected')
         elif t=='record_superseded': s.update(status='superseded',invalid_at=d.get('invalid_at'),superseded_by=d['superseded_by'],change_reason=d.get('reason'))

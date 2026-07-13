@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>com.pavol.brain-projector</string>
+  <key>Label</key><string>__LABEL__</string>
   <key>ProgramArguments</key><array>
     <string>__PYTHON__</string><string>__ROOT__/scripts/run_brain_projector_locked.py</string>
-    <string>--lock-file</string><string>__STATE__/projector.lock</string>
+    <string>--lock-file</string><string>__STATE__/projector-__INSTANCE__.lock</string>
     <string>--timeout</string><string>240</string>
-    <string>--journal-db</string><string>__ROOT__/spike/spike.db</string>
-    <string>--retrieval-db</string><string>__ROOT__/sqlite-spike/retrieval.db</string>
+    <string>--journal-db</string><string>__JOURNAL__</string>
+    <string>--retrieval-db</string><string>__RETRIEVAL__</string>
     <string>--batch-size</string><string>100</string>
     <string>--embedding-base-url</string><string>http://localhost:11434/v1</string>
     <string>--embedding-model</string><string>nomic-embed-text:latest</string>
@@ -15,6 +15,6 @@
   </array>
   <key>StartInterval</key><integer>300</integer>
   <key>ProcessType</key><string>Background</string>
-  <key>StandardOutPath</key><string>__LOGS__/projector.stdout.log</string>
-  <key>StandardErrorPath</key><string>__LOGS__/projector.stderr.log</string>
+  <key>StandardOutPath</key><string>__LOGS__/projector-__INSTANCE__.stdout.log</string>
+  <key>StandardErrorPath</key><string>__LOGS__/projector-__INSTANCE__.stderr.log</string>
 </dict></plist>

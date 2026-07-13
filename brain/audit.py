@@ -1,4 +1,4 @@
-"""Privacy-preserving metadata audit for read-only brain operations."""
+"""Privacy-preserving metadata audit for Brain operations."""
 import json
 import logging
 from datetime import datetime, timezone

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Operator-only bounded projector. The public brain.Brain object remains read-only."""
+"""Operator-only bounded projector; journal writes use a separate contract."""
 import argparse
 import hashlib
 import json

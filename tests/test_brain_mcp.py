@@ -24,10 +24,10 @@ def call(mcp, name, arguments):
 
 def test_exact_tool_list_and_search_schema_parity():
     tools = asyncio.run(server().list_tools())
-    assert [x.name for x in tools] == ["brain_search","brain_get_record","brain_get_related","brain_health","brain_rebuild_status"]
+    assert [x.name for x in tools] == ["brain_search","brain_get_record","brain_get_related","brain_health","brain_rebuild_status","brain_record_outcome","brain_record_decision"]
     actual = tools[0].inputSchema; canonical = SearchRequest.model_json_schema()
     assert actual["properties"] == canonical["properties"] and actual["required"] == canonical["required"]
-    assert not any(word in x.name for x in tools for word in ("write","delete","project","approve","shell"))
+    assert not any(word in x.name for x in tools for word in ("delete","project","approve","shell","remember"))
 
 
 def test_search_success_request_id_and_provenance():
@@ -40,7 +40,7 @@ def test_search_success_request_id_and_provenance():
 def test_validation_feature_and_workspace_denials_are_structured():
     mcp = server()
     missing = call(mcp, "brain_search", {"query":"x","workspaces":[]})
-    assert missing["error"]["code"] == "BRAIN_UNKNOWN_WORKSPACE"
+    assert missing["error"]["code"] == "BRAIN_WORKSPACE_REQUIRED"
     disabled = call(mcp, "brain_search", {"query":"x","workspaces":["ai-pos"],"min_score":0.2})
     assert disabled["error"]["code"] == "BRAIN_FEATURE_NOT_ENABLED"
     denied = call(mcp, "brain_search", {"query":"x","workspaces":["sap-work"],"sensitive_allowed":True})
