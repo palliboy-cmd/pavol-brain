@@ -13,18 +13,18 @@ from pathlib import Path
 from urllib.parse import parse_qs,urlparse
 
 from .api import Brain
-from .config import BrainConfig
-from .control import CLIENT_TYPES,TOOLS,TRANSPORTS,ControlStore,IntegrationProfile
+from .config import BrainConfig,instance_paths
+from .control import CLIENT_TYPES,TOOLS,TRANSPORTS,WRITE_TOOLS,PERSONAL_WORKSPACES,WORK_WORKSPACES,ControlStore,IntegrationProfile
 
 def _sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def connection_test(profile,config,store):
     """Real stdio MCP test with a fixed profile identity and read-only hash gate."""
     from mcp import ClientSession,StdioServerParameters
     from mcp.client.stdio import stdio_client
-    root=Path(__file__).parents[1];before=(_sha(config.journal_db_path),_sha(config.retrieval_db_path))
+    root=Path(__file__).parents[1];journal,retrieval=instance_paths(profile.brain_instance);before=(_sha(journal),_sha(retrieval))
     env={**os.environ,"BRAIN_CONTROL_DB":str(store.path),"BRAIN_INTEGRATION_ID":profile.integration_id,
          "BRAIN_CLIENT_IDENTITY":profile.client_identity,"BRAIN_AUDIT_TEST_CALL":"true",
-         "BRAIN_JOURNAL_DB":str(config.journal_db_path),"BRAIN_RETRIEVAL_DB":str(config.retrieval_db_path),
+         "BRAIN_INSTANCE":profile.brain_instance,"BRAIN_JOURNAL_DB":str(journal),"BRAIN_RETRIEVAL_DB":str(retrieval),
          "BRAIN_AUDIT_LOG":str(config.audit_log_path or Path.home()/"Library/Logs/Pavol-Brain/audit.jsonl")}
     params=StdioServerParameters(command=sys.executable,args=[str(root/"scripts/run_brain_mcp.py")],env=env)
     async def run():
@@ -47,7 +47,7 @@ def connection_test(profile,config,store):
                 denied=json.loads((await session.call_tool("brain_search",{"query":"sensitive denial validation","workspaces":["sap-work"],"sensitive_allowed":True})).content[0].text)
                 if denied.get("error",{}).get("code") not in {"BRAIN_WORKSPACE_DENIED","BRAIN_SENSITIVE_SCOPE_DENIED"}:raise RuntimeError("sensitive workspace was not denied")
         return {"health":health.get("status"),"result_ids":[x["record_id"] for x in (search or {}).get("results",[])]}
-    result=asyncio.run(run());after=(_sha(config.journal_db_path),_sha(config.retrieval_db_path))
+    result=asyncio.run(run());after=(_sha(journal),_sha(retrieval))
     if before!=after:raise RuntimeError("brain database mutation detected")
     return result
 
@@ -87,18 +87,23 @@ class App:
     def integrations(self):
         rows=read_activity(self.audit_path);used={r.get("client_identity") for r in rows if not r.get("test_call")}
         trs=[]
-        for p in self.store.list():trs.append(f'<tr><td><a href="/integrations/{esc(p.integration_id)}">{esc(p.display_name)}</a></td><td>{esc(p.client_type)}</td><td>{"enabled" if p.enabled else "disabled"}</td><td>{esc(p.configuration_status)}</td><td>{"used" if p.client_identity in used or p.last_successful_real_call else "never used"}</td><td>{esc(p.transport)}</td><td>{len(p.allowed_workspaces)}</td><td>{"yes" if p.sensitive_workspace_grants else "no"}</td><td>{esc(p.last_connection_test_status)}</td></tr>')
-        return self.layout("Integrations",'<table><tr><th>Name</th><th>Client</th><th>Access</th><th>Configured</th><th>Actual use</th><th>Transport</th><th>Workspaces</th><th>Sensitive</th><th>Test</th></tr>'+''.join(trs)+'</table>')
+        for p in self.store.list():trs.append(f'<tr><td><a href="/integrations/{esc(p.integration_id)}">{esc(p.display_name)}</a></td><td>{esc(p.client_type)}</td><td>{"enabled" if p.enabled else "disabled"}</td><td>{esc(p.brain_instance)}</td><td>{"enabled" if p.write_enabled else "off"}</td><td>{esc(p.configuration_status)}</td><td>{"used" if p.client_identity in used or p.last_successful_real_call else "never used"}</td><td>{esc(p.transport)}</td><td>{len(p.allowed_workspaces)}</td><td>{"yes" if p.sensitive_workspace_grants else "no"}</td><td>{esc(p.last_connection_test_status)}</td></tr>')
+        return self.layout("Integrations",'<table><tr><th>Name</th><th>Client</th><th>Access</th><th>Instance</th><th>Write</th><th>Configured</th><th>Actual use</th><th>Transport</th><th>Workspaces</th><th>Sensitive</th><th>Test</th></tr>'+''.join(trs)+'</table>')
     def add_form(self):
         checks=lambda name,items:''.join(f'<label><input type="checkbox" name="{name}" value="{esc(x)}"> {esc(x)}</label> ' for x in items)
-        body=f'''<form method="post" action="/integrations/add"><input type="hidden" name="csrf" value="{self.csrf}"><label>ID <input name="integration_id" required pattern="[a-z0-9][a-z0-9-]*"></label><br><label>Name <input name="display_name" required></label><br><label>Client <select name="client_type">{''.join(f'<option>{x}</option>' for x in CLIENT_TYPES)}</select></label><br><label>Transport <select name="transport">{''.join(f'<option>{x}</option>' for x in TRANSPORTS)}</select></label><br><label>Host <input name="host" value="mini-core"></label><fieldset><legend>Allowed workspaces</legend>{checks('allowed_workspaces',['ai-pos','personal','ai-pos-app','smart-timesheet','abap-object-exporter','sap-work'])}</fieldset><fieldset><legend>Sensitive grants</legend>{checks('sensitive_grants',['sap-work'])}</fieldset><fieldset><legend>Allowed tools</legend>{checks('allowed_tools',TOOLS)}</fieldset><label>Reason <input name="reason"></label><p><label><input type="checkbox" name="confirm"> Confirm profile creation</label></p><button>Create disabled profile</button></form>'''
+        common=f'''<label>ID <input name="integration_id" required pattern="[a-z0-9][a-z0-9-]*"></label><br><label>Name <input name="display_name" required></label><br><label>Client <select name="client_type">{''.join(f'<option>{x}</option>' for x in CLIENT_TYPES)}</select></label><br><label>Transport <select name="transport">{''.join(f'<option>{x}</option>' for x in TRANSPORTS)}</select></label><br><label>Host <input name="host" value="mini-core"></label>'''
+        def form(instance,workspaces,sensitive=False):
+            grants=f'<input type="hidden" name="sensitive_grants" value="sap-work">' if sensitive else ''
+            return f'''<h2>{instance.title()}</h2><form method="post" action="/integrations/add"><input type="hidden" name="csrf" value="{self.csrf}"><input type="hidden" name="brain_instance" value="{instance}">{common}<fieldset><legend>Allowed workspaces</legend>{checks('allowed_workspaces',sorted(workspaces))}</fieldset>{grants}<fieldset><legend>Allowed tools</legend>{checks('allowed_tools',TOOLS)}</fieldset><p><label><input type="checkbox" name="write_enabled"> Explicitly grant write access</label></p><label>Reason <input name="reason"></label><p><label><input type="checkbox" name="confirm"> Confirm profile creation</label></p><button>Create disabled {instance} profile</button></form>'''
+        body=form("personal",PERSONAL_WORKSPACES)+form("work",WORK_WORKSPACES,True)
         return self.layout("Add integration",body)
     def detail(self,i):
         p=self.store.get(i)
         if not p:return self.layout("Not found","<p>Unknown integration.</p>")
         cfg=generated_config(p);hist=self.store.history(i);activity=[x for x in read_activity(self.audit_path) if x.get("client_identity")==p.client_identity][:20]
         actions=''.join(f'<form method="post" action="/integrations/{esc(i)}/{a}" style="display:inline"><input type="hidden" name="csrf" value="{self.csrf}"><input type="hidden" name="confirm" value="yes"><input name="reason" placeholder="reason"><button>{a}</button></form>' for a in (["disable"] if p.enabled else ["enable"])+["test","revoke"])
-        body=f'<p>{actions}</p><pre>{esc(json.dumps({**p.__dict__,"generated_configuration":None},indent=2))}</pre><h2>Generated configuration</h2><pre>{esc(cfg)}</pre><h2>Recent activity</h2>{self.activity_table(activity)}<h2>Policy history</h2><table><tr><th>Time</th><th>Actor</th><th>Before</th><th>After</th><th>Fields</th><th>Reason</th></tr>'+''.join(f'<tr><td>{esc(x["occurred_at"])}</td><td>{esc(x["actor"])}</td><td>{esc(x["before_hash"])}</td><td>{esc(x["after_hash"])}</td><td>{esc(x["changed_fields"])}</td><td>{esc(x["reason"])}</td></tr>' for x in hist)+'</table>'
+        write_form=f'''<h2>Write grant</h2><form method="post" action="/integrations/{esc(i)}/write"><input type="hidden" name="csrf" value="{self.csrf}"><label><input type="checkbox" name="write_enabled" {'checked' if p.write_enabled else ''}> Enable writes</label><p>{''.join(f'<label><input type="checkbox" name="write_tools" value="{tool}" {"checked" if tool in p.allowed_tools else ""}> {tool}</label> ' for tool in WRITE_TOOLS)}</p><input name="reason" placeholder="required reason"><label><input type="checkbox" name="confirm"> Confirm write policy change</label><button>Save write grant</button></form>'''
+        body=f'<p>{actions}</p>{write_form}<pre>{esc(json.dumps({**p.__dict__,"generated_configuration":None},indent=2))}</pre><h2>Generated configuration</h2><pre>{esc(cfg)}</pre><h2>Recent activity</h2>{self.activity_table(activity)}<h2>Policy history</h2><table><tr><th>Time</th><th>Actor</th><th>Before</th><th>After</th><th>Fields</th><th>Reason</th></tr>'+''.join(f'<tr><td>{esc(x["occurred_at"])}</td><td>{esc(x["actor"])}</td><td>{esc(x["before_hash"])}</td><td>{esc(x["after_hash"])}</td><td>{esc(x["changed_fields"])}</td><td>{esc(x["reason"])}</td></tr>' for x in hist)+'</table>'
         return self.layout(p.display_name,body)
     def policies(self):
         rows=[]
@@ -113,10 +118,10 @@ class App:
         h=self.brain.health();r=self.brain.rebuild_status();return self.layout("Runtime",f'<h2>Health</h2><pre>{esc(h.model_dump_json(indent=2))}</pre><h2>Projector/build</h2><pre>{esc(r.model_dump_json(indent=2))}</pre><p>LaunchAgent cadence: 300 seconds. Runtime state, locks, logs and backups are outside Git.</p>')
 
 def generated_config(p):
-    root="/Users/pavol/Documents/Personal/Projects/pavol-brain";cmd=f"{root}/scripts/run_brain_mcp_ssh.sh";env={"BRAIN_INTEGRATION_ID":p.integration_id}
-    if p.client_type=="hermes":return f"hermes mcp add {p.integration_id} --command {cmd} --env BRAIN_INTEGRATION_ID={p.integration_id}"
-    if p.client_type=="codex":return f"codex mcp add {p.integration_id} --env BRAIN_INTEGRATION_ID={p.integration_id} -- {cmd}"
-    if p.client_type=="claude":return f"claude mcp add -s user {p.integration_id} -e BRAIN_INTEGRATION_ID={p.integration_id} -- {cmd}\n\n"+json.dumps({"mcpServers":{p.integration_id:{"type":"stdio","command":cmd,"args":[],"env":env}}},indent=2)
+    root=Path(os.getenv("BRAIN_CLIENT_ROOT",Path(__file__).resolve().parents[1]));cmd=str(root/"scripts/run_brain_mcp_ssh.sh");env={"BRAIN_INTEGRATION_ID":p.integration_id,"BRAIN_INSTANCE":p.brain_instance}
+    if p.client_type=="hermes":return f"hermes mcp add {p.integration_id} --command {cmd} --env BRAIN_INTEGRATION_ID={p.integration_id} --env BRAIN_INSTANCE={p.brain_instance}"
+    if p.client_type=="codex":return f"codex mcp add {p.integration_id} --env BRAIN_INTEGRATION_ID={p.integration_id} --env BRAIN_INSTANCE={p.brain_instance} -- {cmd}"
+    if p.client_type=="claude":return f"claude mcp add -s user {p.integration_id} -e BRAIN_INTEGRATION_ID={p.integration_id} -e BRAIN_INSTANCE={p.brain_instance} -- {cmd}\n\n"+json.dumps({"mcpServers":{p.integration_id:{"type":"stdio","command":cmd,"args":[],"env":env}}},indent=2)
     return json.dumps({"mcpServers":{p.integration_id:{"command":cmd,"args":[],"env":env}}},indent=2)
 
 def handler(app):
@@ -143,12 +148,17 @@ def handler(app):
         path=urlparse(self.path).path
         if path=="/integrations/add":
             if one("confirm")!="on":return self.send("explicit confirmation required",400)
-            try:p=IntegrationProfile(one("integration_id"),one("display_name"),one("client_type"),one("transport"),one("host"),False,form.get("allowed_workspaces",[]),form.get("sensitive_grants",[]),form.get("allowed_tools",[]),one("integration_id"));app.store.save(p,reason=one("reason"))
+            try:p=IntegrationProfile(one("integration_id"),one("display_name"),one("client_type"),one("transport"),one("host"),False,form.get("allowed_workspaces",[]),form.get("sensitive_grants",[]),form.get("allowed_tools",[]),one("integration_id"),write_enabled=one("write_enabled")=="on",brain_instance=one("brain_instance","personal"));app.store.save(p,reason=one("reason"))
             except (ValueError,sqlite3.Error) as e:return self.send(esc(e),400)
             return self.send("",303,"/integrations/"+p.integration_id)
         parts=path.strip("/").split("/")
         if len(parts)==3 and parts[0]=="integrations":
             i,action=parts[1],parts[2]
+            if action=="write":
+                if one("confirm")!="on" or not one("reason").strip():return self.send("explicit confirmation and reason required",400)
+                try:app.store.set_write_grant(i,one("write_enabled")=="on",form.get("write_tools",[]),reason=one("reason"))
+                except (KeyError,ValueError) as exc:return self.send(esc(exc),400)
+                return self.send("",303,"/integrations/"+i)
             if one("confirm")!="yes":return self.send("explicit confirmation required",400)
             try:
                 if action=="enable":app.store.set_enabled(i,True,reason=one("reason"))
