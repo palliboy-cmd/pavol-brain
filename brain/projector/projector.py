@@ -9,7 +9,7 @@ from .embedding_cache import pack
 from .errors import ProjectorError, RebuildRequired
 from .journal_reader import JournalReader
 from .models import ProjectionReport, ProjectionStatus
-from .projection import document, eligible, unresolved_relations
+from .projection import FORBIDDEN, document, eligible, unresolved_relations
 from .validation import validate
 
 
@@ -84,25 +84,26 @@ class ProjectionProjector:
 
     def _remove(self, con, record_id, report):
         row = con.execute("SELECT record_id FROM retrieval_documents WHERE record_id=?", (record_id,)).fetchone()
-        if not row: report.noops += 1; return
+        if not row: report.noops += 1; return "already_absent"
         report.links_removed += con.execute("SELECT count(*) FROM retrieval_document_links WHERE record_id=?", (record_id,)).fetchone()[0]
         con.execute("DELETE FROM retrieval_embeddings WHERE record_id=?", (record_id,))
         con.execute("DELETE FROM retrieval_fts WHERE rowid=(SELECT doc_id FROM retrieval_documents WHERE record_id=?)", (record_id,))
         con.execute("DELETE FROM retrieval_documents WHERE record_id=?", (record_id,)); report.removed += 1
+        return "removed"
 
     def _upsert(self, con, doc, report):
         previous = con.execute("SELECT * FROM retrieval_documents WHERE record_id=?", (doc["record_id"],)).fetchone()
         if previous and previous["projection_hash"] == doc["projection_hash"]:
-            report.noops += 1
+            report.noops += 1; action = "unchanged"
         else:
             values = (doc["record_id"], doc["workspace"], doc["type"], doc["sensitivity"], doc["status"], doc["valid_at"], doc["invalid_at"], doc["confidence"], doc["title"], doc["body"], doc["artifacts_text"], doc["canonical_text"], doc["projection_hash"], int(doc["is_current"]), doc["source_event_id"], doc["supersedes"], doc["superseded_by"])
             if previous:
                 con.execute("""UPDATE retrieval_documents SET workspace=?,type=?,sensitivity=?,status=?,valid_at=?,invalid_at=?,confidence=?,title=?,body=?,artifacts_text=?,canonical_text=?,projection_hash=?,is_current=?,source_event_id=?,supersedes=?,superseded_by=? WHERE record_id=?""", values[1:] + (doc["record_id"],))
                 con.execute("DELETE FROM retrieval_fts WHERE rowid=?", (previous["doc_id"],)); report.updated += 1
-                doc_id = previous["doc_id"]
+                doc_id = previous["doc_id"]; action = "updated"
             else:
                 con.execute("""INSERT INTO retrieval_documents(record_id,workspace,type,sensitivity,status,valid_at,invalid_at,confidence,title,body,artifacts_text,canonical_text,projection_hash,is_current,source_event_id,supersedes,superseded_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", values)
-                doc_id = con.execute("SELECT doc_id FROM retrieval_documents WHERE record_id=?", (doc["record_id"],)).fetchone()[0]; report.inserted += 1
+                doc_id = con.execute("SELECT doc_id FROM retrieval_documents WHERE record_id=?", (doc["record_id"],)).fetchone()[0]; report.inserted += 1; action = "inserted"
             con.execute("INSERT INTO retrieval_fts(rowid,title,body,artifacts_text) VALUES (?,?,?,?)", (doc_id, doc["title"], doc["body"], doc["artifacts_text"]))
         existing = {(r["artifact_uri"], r["relation"]) for r in con.execute("SELECT artifact_uri,relation FROM retrieval_document_links WHERE record_id=?", (doc["record_id"],))}
         desired = {(link["artifact_uri"], link["relation"]): link for link in doc["artifact_links"]}
@@ -112,11 +113,35 @@ class ProjectionProjector:
             con.execute("INSERT OR REPLACE INTO retrieval_document_links VALUES (?,?,?,?,?,?)", (doc["record_id"], link["artifact_uri"], link["relation"], link["confidence"], link["origin"], link["verified_at"]))
         cached = con.execute("SELECT projection_hash,model_fingerprint,dimensions FROM retrieval_embeddings WHERE record_id=?", (doc["record_id"],)).fetchone()
         if cached and cached["projection_hash"] == doc["projection_hash"] and cached["model_fingerprint"] == self.config.embedding_model_fingerprint and cached["dimensions"] == self.config.embedding_dimension:
-            report.embeddings_reused += 1; return
+            report.embeddings_reused += 1; return action
         vector, exact_model = self.embedder.embed_document(doc["canonical_text"])
         if len(vector) != self.config.embedding_dimension: raise ProjectorError("embedding_dimension_changed_during_projection")
         con.execute("""INSERT OR REPLACE INTO retrieval_embeddings(record_id,model_fingerprint,model_identifier,dimensions,vector,vector_norm,projection_hash,created_at) VALUES (?,?,?,?,?,?,?,?)""", (doc["record_id"], self.config.embedding_model_fingerprint, exact_model, len(vector), pack(vector), 1.0, doc["projection_hash"], datetime.now(timezone.utc).isoformat()))
         report.embeddings_created += 1
+        return action
+
+    def _assert_projected(self, con, doc):
+        """Gate cursor movement on a complete derived document + embedding pair."""
+        row = con.execute("""SELECT d.projection_hash document_hash,e.projection_hash embedding_hash,
+                          e.model_fingerprint,e.dimensions
+                          FROM retrieval_documents d LEFT JOIN retrieval_embeddings e USING(record_id)
+                          WHERE d.record_id=?""", (doc["record_id"],)).fetchone()
+        if not row:
+            raise ProjectorError("accepted_record_missing_document")
+        if row["document_hash"] != doc["projection_hash"]:
+            raise ProjectorError("accepted_record_document_hash_mismatch")
+        if row["embedding_hash"] != doc["projection_hash"]:
+            raise ProjectorError("accepted_record_missing_or_mismatched_embedding")
+        if row["model_fingerprint"] != self.config.embedding_model_fingerprint or row["dimensions"] != self.config.embedding_dimension:
+            raise ProjectorError("accepted_record_embedding_contract_mismatch")
+
+    @staticmethod
+    def _skip_reason(record):
+        if record["status"] in FORBIDDEN:
+            return "status_" + record["status"]
+        if record["type"] == "artifact_link":
+            return "artifact_no_verified_active_relations"
+        return "not_eligible"
 
     def run_once(self, batch_size=100):
         con = self._write(); head = self.journal.head(); issues = validate(con, head, self.config)
@@ -132,6 +157,10 @@ class ProjectionProjector:
         # validation event with a future effective_at does not apply yet.
         build_time = datetime.now(timezone.utc).isoformat()
         snapshots = {event["record_id"]: self.journal.snapshot(event["record_id"], validation_as_of=build_time) for event in events}
+        missing = sorted(record_id for record_id, record in snapshots.items() if record is None)
+        if missing:
+            return ProjectionReport(ProjectionStatus.REBUILD_REQUIRED, before, before, head, events_seen=len(events),
+                                    details={"issues": ["missing_record_snapshot"], "record_ids": missing})
         unresolved = {record_id: links for record_id, record in snapshots.items() if record and (links := unresolved_relations(record))}
         if unresolved:
             return ProjectionReport(ProjectionStatus.REBUILD_REQUIRED, before, before, head, events_seen=len(events),
@@ -141,10 +170,19 @@ class ProjectionProjector:
             con.execute("BEGIN IMMEDIATE"); self._inject("after_batch_read")
             # Coalesce event batches by record while retaining the batch cursor.
             source_ids = {event["record_id"]: self.journal.source_event_id(event) for event in events}
+            outcomes = []
             for record_id, source_id in source_ids.items():
                 record = snapshots[record_id]
-                if record is None or not eligible(record): self._remove(con, record_id, report)
-                else: self._upsert(con, document(record, source_id, self.config.projection_schema_version), report)
+                if not eligible(record):
+                    outcomes.append({"record_id": record_id, "result": "skipped", "reason": self._skip_reason(record),
+                                     "action": self._remove(con, record_id, report)})
+                else:
+                    doc = document(record, source_id, self.config.projection_schema_version)
+                    action = self._upsert(con, doc, report)
+                    self._assert_projected(con, doc)
+                    outcomes.append({"record_id": record_id, "result": "projected", "action": action,
+                                     "projection_hash": doc["projection_hash"]})
+            report.details["record_outcomes"] = outcomes
             self._inject("after_documents"); self._inject("after_embeddings"); self._inject("before_cursor_update")
             set_cursor(con, report.cursor_after, self.config); self._inject("before_commit")
             con.execute("INSERT OR REPLACE INTO retrieval_embedding_meta(key,value) VALUES (?,?)", ("contract", json.dumps({"fingerprint": self.config.embedding_model_fingerprint, "exact_model_identifier": self.config.embedding_model_identifier, "dimension": self.config.embedding_dimension}, sort_keys=True)))
@@ -152,4 +190,4 @@ class ProjectionProjector:
         except Exception as exc:
             con.rollback()
             if isinstance(exc, RebuildRequired): raise
-            raise ProjectorError(f"projection_transaction_rolled_back:{type(exc).__name__}") from exc
+            raise ProjectorError(f"projection_transaction_rolled_back:{type(exc).__name__}:{exc}") from exc

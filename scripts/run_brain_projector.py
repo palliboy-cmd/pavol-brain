@@ -27,14 +27,20 @@ def main():
     projector = ProjectionProjector(config, HttpDocumentEmbedder(a.embedding_base_url, a.embedding_model, a.embedding_dimension))
     journal_hash_before = sha256(a.journal_db)
     output = {"journal_path": str(a.journal_db), "retrieval_path": str(a.retrieval_db), "journal_hash_before": journal_hash_before, "journal_schema_audit": JournalReader(a.journal_db).audit()}
+    failed = False
     if a.plan: output["plan"] = projector.plan(a.batch_size).as_dict()
-    if a.run_once: output["run"] = projector.run_once(a.batch_size).as_dict()
-    if a.validate: output["validation"] = projector.validate()
+    if a.run_once:
+        output["run"] = projector.run_once(a.batch_size).as_dict()
+        failed = output["run"]["status"] in {"REBUILD_REQUIRED", "FAILED"}
+    if a.validate:
+        output["validation"] = projector.validate()
+        failed = failed or output["validation"]["status"] in {"REBUILD_REQUIRED", "FAILED"}
     output["journal_hash_after"] = sha256(a.journal_db); output["journal_unchanged"] = output["journal_hash_before"] == output["journal_hash_after"]
     text = json.dumps(output, ensure_ascii=False, indent=2, default=str)
     if a.output:
         a.output.write_text(text + "\n")
         a.output.with_name("slice2-journal-schema-audit.json").write_text(json.dumps(output["journal_schema_audit"], ensure_ascii=False, indent=2) + "\n")
     print(text)
+    return 2 if failed else 0
 
-if __name__ == "__main__": main()
+if __name__ == "__main__": raise SystemExit(main())

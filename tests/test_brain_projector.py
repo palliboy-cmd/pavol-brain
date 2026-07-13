@@ -1,6 +1,8 @@
+import gc
 import hashlib
 import json
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -30,7 +32,9 @@ class ProjectorTests(unittest.TestCase):
         self.journal = root / "journal.db"; self.retrieval = root / "retrieval.db"; journal_fixture(self.journal)
         self.embedder = FakeEmbedder(); self.config = ProjectorConfig(self.journal, self.retrieval, "fake-fingerprint", 4, "fake-embedder")
         self.projector = ProjectionProjector(self.config, self.embedder)
-    def tearDown(self): self.tmp.cleanup()
+    def tearDown(self):
+        gc.collect()
+        self.tmp.cleanup()
     def _full(self):
         while self.projector.run_once(100).status == ProjectionStatus.HEALTHY: pass
     def _counts(self):
@@ -58,6 +62,41 @@ class ProjectorTests(unittest.TestCase):
         con.execute("INSERT INTO memory_records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", ("rec-new",1,"fact","ai-pos","normal",payload,payload,"hash","idempotency-new","fixture","imported_curated",None,None,None,1.0,"2026-08-03T00:00:00+00:00","2026-08-03T00:00:00+00:00"))
         con.execute("INSERT INTO record_state VALUES (?,?,?,?,?,?,?,?,?,?,?)", ("rec-new","accepted","human_approved",None,None,None,None,"none",None,None,"evt-new")); con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)", ("evt-new","rec-new","record_created","2026-08-03T00:00:00+00:00","fixture","{}")); con.commit()
         report=self.projector.run_once(); self.assertEqual(report.inserted,1); self.assertEqual(self._counts(),(52,52))
+
+    def test_v2_outcome_cannot_advance_cursor_without_projection(self):
+        self._full(); con=sqlite3.connect(self.journal)
+        payload=json.dumps({"summary":"M1 client outcome","changes":["configured"],"verification":{"tests":"pass"},"open_questions":[],"artifacts":[],"commit":None})
+        values=("rec-v2",2,"outcome","personal","normal",payload,payload,"hash-v2","idempotency-v2","hermes-personal","explicit_user_confirmation",None,None,None,1.0,"2026-08-03T01:00:00+00:00","2026-08-03T01:00:00+00:00")
+        con.execute("INSERT INTO memory_records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",values)
+        con.execute("INSERT INTO record_state VALUES (?,?,?,?,?,?,?,?,?,?,?)",("rec-v2","accepted","auto_accepted",None,None,None,None,"none",None,None,"evt-v2"))
+        con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)",("evt-v2","rec-v2","record_created","2026-08-03T01:00:00+00:00","hermes-personal","{}"));con.commit();con.close()
+        before=sqlite3.connect(self.retrieval).execute("SELECT last_source_event_id FROM retrieval_projection_cursor WHERE singleton=1").fetchone()[0]
+        class SilentSkipProjector(ProjectionProjector):
+            def _upsert(self, con, doc, report): return "silently_skipped"
+        with self.assertRaisesRegex(Exception,"accepted_record_missing_document"):
+            SilentSkipProjector(self.config,self.embedder).run_once()
+        check=sqlite3.connect(self.retrieval)
+        self.assertEqual(check.execute("SELECT last_source_event_id FROM retrieval_projection_cursor WHERE singleton=1").fetchone()[0],before)
+        self.assertIsNone(check.execute("SELECT record_id FROM retrieval_documents WHERE record_id='rec-v2'").fetchone())
+        report=self.projector.run_once();self.assertEqual(report.inserted,1)
+        self.assertEqual(report.details["record_outcomes"],[{"record_id":"rec-v2","result":"projected","action":"inserted","projection_hash":check.execute("SELECT projection_hash FROM retrieval_documents WHERE record_id='rec-v2'").fetchone()[0]}])
+
+    def test_missing_record_event_blocks_cursor_and_cli_exits_nonzero(self):
+        self._full(); con=sqlite3.connect(self.journal)
+        con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)",("evt-missing","rec-missing","record_created","2026-08-03T02:00:00+00:00","fixture","{}"));con.commit();con.close()
+        before=sqlite3.connect(self.retrieval).execute("SELECT last_source_event_id FROM retrieval_projection_cursor WHERE singleton=1").fetchone()[0]
+        report=self.projector.run_once();self.assertEqual(report.status,ProjectionStatus.REBUILD_REQUIRED)
+        self.assertEqual(report.details,{"issues":["missing_record_snapshot"],"record_ids":["rec-missing"]})
+        self.assertEqual(sqlite3.connect(self.retrieval).execute("SELECT last_source_event_id FROM retrieval_projection_cursor WHERE singleton=1").fetchone()[0],before)
+        result=subprocess.run([sys.executable,str(ROOT/"scripts/run_brain_projector.py"),"--journal-db",str(self.journal),"--retrieval-db",str(self.retrieval),"--run-once"],capture_output=True,text=True)
+        self.assertEqual(result.returncode,2);self.assertIn('"status": "REBUILD_REQUIRED"',result.stdout)
+
+    def test_ineligible_skip_has_deterministic_audit_reason(self):
+        self._full(); con=sqlite3.connect(self.journal)
+        con.execute("UPDATE record_state SET status='forgotten',updated_event_id='evt-audit-skip' WHERE record_id='rec-001'")
+        con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)",("evt-audit-skip","rec-001","record_forgotten","2026-08-03T03:00:00+00:00","fixture","{}"));con.commit();con.close()
+        report=self.projector.run_once()
+        self.assertEqual(report.details["record_outcomes"],[{"record_id":"rec-001","result":"skipped","reason":"status_forgotten","action":"removed"}])
     def test_forget_removes_existing_document(self):
         self._full(); con=sqlite3.connect(self.journal); con.execute("UPDATE record_state SET status='forgotten',updated_event_id='evt-forget' WHERE record_id='rec-001'"); con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)", ("evt-forget","rec-001","record_forgotten","2026-08-04T00:00:00+00:00","fixture","{}")); con.commit()
         report=self.projector.run_once(); self.assertEqual(report.removed,1); self.assertEqual(self._counts(),(50,50))
