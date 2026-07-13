@@ -12,12 +12,22 @@ FORBIDDEN={'candidate','rejected','forgotten'}
 
 def canonical_text(record):
     p=record['payload']; kind=record['type']
-    if kind=='decision': title=p['statement']; body=f"Rationale: {p.get('rationale','')} Status: {p.get('decision_status','')}"
-    elif kind=='outcome': title=p['summary']; body=f"Changes: {'; '.join(p.get('changes',[]))}. Verification: {json.dumps(p.get('verification',{}),sort_keys=True)}"
+    if kind=='decision':
+        title=p['statement']; body=f"Rationale: {p.get('rationale','')} Status: {p.get('decision_status','')}"
+        if record.get('schema_version',1)>=2:
+            body += f" Verdict: {p.get('verdict','')} Reason: {p.get('reason','')} Reopen when: {p.get('reopen_when') or ''} Alternatives: {json.dumps(p.get('alternatives',[]),sort_keys=True,ensure_ascii=False)} Evidence: {' '.join(p.get('evidence',[]))}"
+    elif kind=='outcome':
+        title=p['summary']; body=f"Changes: {'; '.join(p.get('changes',[]))}. Verification: {json.dumps(p.get('verification',{}),sort_keys=True)}"
+        if record.get('schema_version',1)>=2:
+            body += f" Open questions: {'; '.join(p.get('open_questions',[]))}. Commit: {p.get('commit') or ''}"
+    elif kind=='problem': title=p['statement']; body=f"Impact: {p.get('impact','')} Evidence: {' '.join(p.get('evidence',[]))}"
+    elif kind=='analysis': title=p['summary']; body=f"Findings: {'; '.join(p.get('findings',[]))}. Evidence: {' '.join(p.get('evidence',[]))}"
     elif kind=='fact': title=f"{p['subject']} {p['predicate']} {p['object']}"; body=f"Evidence: {p.get('evidence','')}"
     elif kind=='artifact_link': title=f"{p['relation']} {p['artifact_uri']}"; body=f"Source record: {p['source_record']}. Origin claim: {p.get('origin_claim','')}"
     else: raise ValueError(f'unsupported record type {kind}')
-    artifacts=' '.join([p.get('artifact_uri',''), *p.get('artifacts',[])])
+    evidence_artifacts=p.get('evidence',[]) if record.get('schema_version',1)>=2 and isinstance(p.get('evidence',[]),list) else []
+    commit_artifact=[p['commit']] if record.get('schema_version',1)>=2 and p.get('commit') else []
+    artifacts=' '.join([p.get('artifact_uri',''), *p.get('artifacts',[]), *evidence_artifacts, *commit_artifact])
     return title,body,artifacts,'\n'.join((title,body,artifacts)).strip()
 
 def source_records(path=DATASET):

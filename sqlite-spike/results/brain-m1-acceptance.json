@@ -1,0 +1,81 @@
+{
+  "milestone": "M1 closed memory loop",
+  "date": "2026-07-13",
+  "deployment_status": "not deployed; live bootstrap intentionally blocked pending operator resolution of rec-056 -> rec-001",
+  "live_reference_preflight": {
+    "records": 55,
+    "events": 157,
+    "integrity_check": "ok",
+    "foreign_key_violations": 0,
+    "blocking_reference": {
+      "source_record": "rec-056",
+      "source_workspace": "sap-work",
+      "target_record": "rec-001",
+      "target_workspace": "ai-pos",
+      "field_path": "payload.source_record",
+      "resolution": "explicit operator-curated data decision required; no automatic rewrite"
+    }
+  },
+  "representative_bootstrap_manifest": {
+    "fixture_note": "55-record fixture with an explicit synthetic same-WORK replacement used only to exercise the clean publish path",
+    "source_sha256_before": "d297215f31f95ab1f7210afc31b158886e69db9c49435c07c330d1250e6f1351",
+    "source_sha256_after": "d297215f31f95ab1f7210afc31b158886e69db9c49435c07c330d1250e6f1351",
+    "source_logical_digest": "4cbe35281c47026df426db5cac1faf195303610337236fe2da0bb94238d37b33",
+    "partition": {
+      "personal": ["abap-object-exporter", "ai-pos", "ai-pos-app", "personal", "smart-timesheet"],
+      "work": ["sap-work"]
+    },
+    "counts": {"memory_records": 55, "memory_events": 55, "record_state": 55, "artifact_links": 0, "artifact_validation_events": 14},
+    "cross_partition_references": [],
+    "journal_logical_digests": {
+      "personal": "776a40d26316be0e3269b4d963730d93f7f39d36d73291db7655881ceca3531b",
+      "work": "51e6076d45a6aa5dd06e31ffaa50d4f02da3a0de7ee360bc7ed1efa871f480ae"
+    }
+  },
+  "migration_evidence": {
+    "test": "tests/test_brain_write.py::test_representative_migration_preserves_all_canonical_tables_and_projection_hashes",
+    "tables": ["memory_records", "memory_events", "record_state", "artifact_links", "artifact_validation_events", "artifact_validation_state"],
+    "pre_post_digests_equal": true,
+    "existing_projection_hashes_equal": true,
+    "already_v2_retry_safe": true
+  },
+  "artifact_validation": {
+    "valid_repo_path": "verified_active / Band A",
+    "valid_commit": "verified_active / Band A",
+    "missing_repo_path": "verified_inactive / candidate",
+    "unverifiable_doc_uri": "unknown / candidate",
+    "events": "append-only artifact_validation_events with server validator evidence"
+  },
+  "profile_policy_acceptance": {
+    "profiles": [
+      {"identity": "agent-a", "instance": "personal", "workspace": "personal", "write_enabled": true},
+      {"identity": "agent-b", "instance": "personal", "workspace": "personal", "write_enabled": false},
+      {"identity": "work-agent", "instance": "work", "workspace": "sap-work", "sensitive_grant": true, "write_enabled": true}
+    ],
+    "policy": "real ControlStore + RegistryPolicy with launcher identity and instance binding",
+    "zero_leak_assertions": [
+      "Personal cannot request WORK",
+      "WORK cannot request Personal",
+      "journals contain no opposite-instance workspace rows",
+      "search filters corrupt cross-scope record links",
+      "WORK normal request is raised to sensitive",
+      "default-off profile cannot write"
+    ]
+  },
+  "idempotency_and_duplicates": {
+    "same_agent_same_key_same_request": "original record returned with idempotent=true",
+    "same_agent_same_key_different_request": "BRAIN_IDEMPOTENCY_CONFLICT",
+    "different_agent_same_key_same_content": "new candidate with possible_duplicate_of; never another Band A record",
+    "instance_namespace": "same client key is independent in physically separate Personal and WORK journals"
+  },
+  "acceptance_flow": {
+    "test": "tests/test_brain_m1_acceptance.py::test_closed_memory_loop_two_profiles_and_two_instances",
+    "assertions": [
+      "agent A reads context and writes verified outcome/decision",
+      "real projector transactions index the records",
+      "agent B finds and loads the outcome without conversation history",
+      "same-agent retry is idempotent",
+      "WORK sensitivity floor and physical separation hold"
+    ]
+  }
+}

@@ -3,7 +3,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 import pytest
 sys.path.insert(0,str(Path(__file__).parents[1]))
-from brain.control import ControlStore,IntegrationProfile,TOOLS
+from brain.control import ControlStore,IntegrationProfile,READ_TOOLS,TOOLS
 from brain.control_center import App,generated_config,handler,metrics,read_activity,serve
 
 class FakeBrain:
@@ -19,7 +19,7 @@ def app(tmp_path):
  return App(ControlStore(tmp_path/"control.db"),FakeBrain(),log,csrf="token")
 
 def test_pages_render_without_query_or_record_content(tmp_path):
- a=app(tmp_path);a.store.save(IntegrationProfile("agent","Agent","custom_mcp","ssh_stdio","mini",True,["personal"],[],list(TOOLS),"agent"))
+ a=app(tmp_path);a.store.save(IntegrationProfile("agent","Agent","custom_mcp","ssh_stdio","mini",True,["personal"],[],list(READ_TOOLS),"agent"))
  pages=[a.overview(),a.integrations(),a.add_form(),a.detail("agent"),a.policies(),a.activity(),a.runtime()]
  text="".join(pages);assert "PRIVATE RAW QUERY" not in text and "rec-1" in text and "brain_search" in text
 
@@ -30,13 +30,18 @@ def test_empty_malformed_audit_and_test_usage_separation(tmp_path):
 
 def test_generated_config_is_profile_specific(tmp_path):
  for client in ("hermes","codex","claude","custom_mcp"):
-  p=IntegrationProfile("future","Future",client,"ssh_stdio","mini",False,["personal"],[],list(TOOLS),"future")
+  p=IntegrationProfile("future","Future",client,"ssh_stdio","mini",False,["personal"],[],list(READ_TOOLS),"future",brain_instance="personal")
   cfg=generated_config(p);assert "future" in cfg and "run_brain_mcp_ssh.sh" in cfg and "PRIVATE" not in cfg
 
+def test_add_forms_offer_only_instance_compatible_workspaces(tmp_path):
+ text=app(tmp_path).add_form();personal,work=text.split("<h2>Work</h2>")
+ assert "sap-work" not in personal
+ assert "sap-work" in work and 'value="personal"' not in work and "ai-pos" not in work
+
 def test_claude_config_targets_effective_user_scoped_cowork_configuration():
- p=IntegrationProfile("claude","Claude","claude","ssh_stdio","mini",True,["ai-pos"],[],list(TOOLS),"claude")
+ p=IntegrationProfile("claude","Claude","claude","ssh_stdio","mini",True,["ai-pos"],[],list(READ_TOOLS),"claude",brain_instance="personal")
  cfg=generated_config(p)
- assert "claude mcp add -s user" in cfg and '"type": "stdio"' in cfg and "BRAIN_INTEGRATION_ID=claude" in cfg
+ assert "claude mcp add -s user" in cfg and '"type": "stdio"' in cfg and "BRAIN_INTEGRATION_ID=claude" in cfg and "BRAIN_INSTANCE=personal" in cfg
 
 def test_csrf_post_only_and_lifecycle(tmp_path):
  a=app(tmp_path);srv=ThreadingHTTPServer(("127.0.0.1",0),handler(a));threading.Thread(target=srv.serve_forever,daemon=True).start();base=f"http://127.0.0.1:{srv.server_port}"
@@ -44,6 +49,8 @@ def test_csrf_post_only_and_lifecycle(tmp_path):
   with pytest.raises(urllib.error.HTTPError) as e:urllib.request.urlopen(urllib.request.Request(base+"/integrations/add",data=b"integration_id=x",method="POST"));assert e.value.code==403
   data=urllib.parse.urlencode({"csrf":"token","confirm":"on","integration_id":"new-agent","display_name":"New","client_type":"custom_mcp","transport":"ssh_stdio","host":"mini","allowed_workspaces":"personal","allowed_tools":"brain_search"}).encode()
   urllib.request.urlopen(urllib.request.Request(base+"/integrations/add",data=data,method="POST"));assert a.store.get("new-agent") and not a.store.get("new-agent").enabled
+  grant=urllib.parse.urlencode({"csrf":"token","confirm":"on","write_enabled":"on","write_tools":"brain_record_outcome","reason":"handoff outcomes"}).encode()
+  urllib.request.urlopen(urllib.request.Request(base+"/integrations/new-agent/write",data=grant,method="POST"));assert a.store.get("new-agent").write_enabled
   assert urllib.request.urlopen(base+"/integrations").status==200
  finally:srv.shutdown()
 

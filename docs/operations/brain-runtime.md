@@ -1,24 +1,30 @@
 # Pavol-Brain runtime operations
 
-The canonical SQLite journal is append-only truth. `sqlite-spike/retrieval.db` is a disposable derived index. The runtime has no public listener: agents use local or SSH stdio MCP, and only the operator projector writes the derived database.
+Each canonical SQLite journal is append-only truth and each retrieval database is a disposable derived index. M1 runs separate Personal and WORK journals/indexes with no cross-instance retrieval; the former mixed database is a read-only `legacy` rollback source. The runtime has no public listener: agents use local or SSH stdio MCP, the governed writer appends to a journal, and only the operator projector writes a derived database.
 
 ## Projector
 
-`scripts/run_brain_projector_locked.py` performs one bounded iteration, uses a non-blocking file lock, times out after 240 seconds by default, exits non-zero on failure, and is safe to retry. The LaunchAgent template runs it every 300 seconds with explicit Python, database, endpoint, model, and dimension arguments. Install or update it on mini-core from the repository root:
+`scripts/run_brain_projector_locked.py` performs one bounded iteration, uses a non-blocking file lock, times out after 240 seconds by default, exits non-zero on failure, and is safe to retry. The LaunchAgent template runs it every 300 seconds with explicit Python, database, endpoint, model, and dimension arguments. After bootstrap, build both indexes and review their manifests before preparing or activating LaunchAgents:
 
 ```sh
-BRAIN_PYTHON="$PWD/.venv/bin/python" scripts/install_brain_launchagent.sh
-launchctl print "gui/$(id -u)/com.pavol.brain-projector"
+BRAIN_BOOTSTRAP_MANIFEST=/path/to/reviewed-split-manifest.json BRAIN_PYTHON="$PWD/.venv/bin/python" scripts/build_brain_m1_indexes.sh
+BRAIN_BOOTSTRAP_MANIFEST=/path/to/reviewed-split-manifest.json BRAIN_M1_APPROVED=yes scripts/install_brain_m1_projectors.sh
+BRAIN_BOOTSTRAP_MANIFEST=/path/to/reviewed-split-manifest.json BRAIN_M1_APPROVED=yes BRAIN_ACTIVATE_PROJECTORS=yes scripts/install_brain_m1_projectors.sh
+launchctl print "gui/$(id -u)/com.pavol.brain-projector-personal"
+launchctl print "gui/$(id -u)/com.pavol.brain-projector-work"
 ```
 
 Logs and the lock live under `~/Library/Logs/Pavol-Brain` and `~/Library/Application Support/Pavol-Brain`, outside Git. Uninstall with:
 
 ```sh
-launchctl bootout "gui/$(id -u)/com.pavol.brain-projector"
-rm "$HOME/Library/LaunchAgents/com.pavol.brain-projector.plist"
+launchctl bootout "gui/$(id -u)/com.pavol.brain-projector-personal"
+launchctl bootout "gui/$(id -u)/com.pavol.brain-projector-work"
+rm "$HOME/Library/LaunchAgents/com.pavol.brain-projector-personal.plist" "$HOME/Library/LaunchAgents/com.pavol.brain-projector-work.plist"
 ```
 
 Before replacing an active index, use SQLite `.backup`, verify `PRAGMA integrity_check`, run plan/build/validate on a disposable database, run the 24-query parity gate, retain the old active file, and switch using a same-directory rename. Roll back by stopping the LaunchAgent and renaming the retained `retrieval.db.pre-*` file to `retrieval.db`.
+
+M1 rollout order is fixed: backup legacy/control state; bootstrap dry-run; operator resolution of every reference finding; staged dual-journal build; digest/partition gate; explicit publish approval; one-shot dual-index build; parity/manifest review; disabled profile creation; read-only smoke; `RegistryPolicy` write smoke against disposable staging journals; plist preparation; final dual activation. On any failure, keep legacy read-only, revoke the new profiles, boot out both M1 labels and remove only unpublished/staging outputs. Published M1 files are retained for forensics until the operator explicitly removes them.
 
 ## Health interpretation
 
