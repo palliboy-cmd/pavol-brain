@@ -1,6 +1,6 @@
 # M1 — Closed memory loop
 
-Status: implemented in the repository; not deployed to mini-core and not committed.
+Status: Accepted — deployed to mini-core and live-accepted on 2026-07-13.
 
 ## Decision: Personal and WORK isolation
 
@@ -140,4 +140,4 @@ Rollback is one unit: disable/revoke new profiles, boot out both M1 projectors, 
 
 ## Deferred
 
-Candidate approval/rejection remains an operator/review workflow; M1 does not add its UI or MCP tools. Deployment and live mini-core evidence require an explicit operator change window. Cross-instance retrieval, automatic hooks, `brain_context`, Obsidian export, Graphiti, knowledge loops, Slice 5 tuning and transcript storage remain out of scope.
+Candidate approval/rejection remains an operator/review workflow; M1 does not add its UI or MCP tools. Cross-instance retrieval, automatic hooks, `brain_context`, Obsidian export, Graphiti, knowledge loops, Slice 5 tuning and transcript storage remain out of scope.

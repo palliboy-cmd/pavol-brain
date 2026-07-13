@@ -1,6 +1,6 @@
 # Proposal 006: Vector-Only Retrieval Integration
 
-- **Status:** In progress — Slice 1 and Slice 2 implemented and live-validated (2026-07-12); Slices 3–6 open; production label still gated by §22
+- **Status:** In progress — Slices 1–4 implemented and live-validated (2026-07-12); Slices 5–6 remain open; production label is still gated by §22
 - **Date:** 2026-07-12
 - **Follows:** [Proposal 002](002-pavol-brain-shared-memory-and-knowledge-graph.md), [Proposal 003](003-graphiti-spike-design.md), [Proposal 004](004-graphiti-spike-architecture-review.md), [Proposal 005](005-sqlite-fts5-embeddings-retrieval-baseline.md)
 - **Decision inputs:** `spike/DECISION.md` (**NO for the tested local Graphiti 0.29.2 + structured-output stack; graph retrieval quality was not evaluated.**), `sqlite-spike/DECISION.md` (GO WITH CONDITIONS — vector-only)

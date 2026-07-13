@@ -1,10 +1,12 @@
 # Brain Direction Reassessment — Pavol-Brain ako dlhodobý externý mozog
 
-- **Status:** Finálny rozhodovací podklad (v2 — doplnený Greenfield test a korekcie API) — nič nie je implementované ani commitnuté
+- **Status:** Accepted — rozhodnutia pre M1 boli implementované a live-accepted na mini-core (2026-07-13)
 - **Dátum:** 2026-07-13
 - **Autor:** Claude (Fable 5) na základe zadania Pavla Pavlovského
 - **Vstupy:** Proposals 001–008 · `spike/DECISION.md` · `sqlite-spike/DECISION.md` · `spike/schema/journal.sql` · `brain/` (kód) · `docs/operations/*` · `docs/integrations/*` · web rešerš 2026-07-13
 - **Značenie tvrdení:** **[repo]** = overiteľný fakt z repozitára · **[web]** = externý zdroj, orientačne · **[návrh]** = odporúčanie tohto dokumentu, nie prijatý fakt
+
+> **Stav po M1:** M1 uzavrel čítanie → práca → kontrolovaný zápis → handoff medzi agentmi. Potvrdené rozhodnutia a trvalý výsledok sú v [ADR-001](adr-001-m1-live-acceptance.md); ďalšie vedome odložené témy sú v [M2 backlogue](m2-roadmap.md).
 
 ---
 
@@ -102,7 +104,7 @@ derived retrieval index (vector-only, disposable, rebuildovateľný)
 - **Markdown/Obsidian = len projekcia/export, nie autorita.** V MVP ani to nie — odkladá sa (viď §11).
 - **Graphiti = voliteľná odvodená vrstva, dnes žiadna.** Journal umožňuje graf kedykoľvek doplniť ako ďalšiu projekciu popri vektoroch; re-open len podľa DECISION klauzuly.
 - **Jeden nový kus:** write cesta = tie isté transporty, tá istá knižnica, nové operácie s policy. Žiadny server framework, žiadny event bus, žiadna queue.
-- **Izolácia sensitive/WORK dát sa rozhoduje pred write cestou.** Preferovaný variant na zhodnotenie: **dve samostatné inštancie** — Personal Brain a WORK Brain (dva journaly, dva MCP profily). Zero-leak potom platí konštrukciou, nie testami, a odpadá časť grant/policy mašinérie. Cena: žiadne queries ponad Personal↔WORK hranicu — ktorá sa aj tak nemá prekračovať. Alternatíva: ponechať dnešnú riadkovú sensitivity policy. Rozhodnutie je krok 0 míľnika M1 (§16), lebo write cesta ho inak zabetónuje.
+- **Izolácia sensitive/WORK dát je potvrdená pred write cestou.** M1 používa **dve samostatné inštancie** — Personal Brain a WORK Brain (dva journaly, dva MCP profily). Zero-leak preto platí konštrukciou, nie iba policy testami. Cena: žiadne queries ponad Personal↔WORK hranicu — ktorá sa ani nemá prekračovať. Riadková sensitivity policy nebola zvolená ako hranica medzi inštanciami.
 
 ## 7. Minimálny informačný model
 
@@ -244,7 +246,7 @@ Kontrolná otázka pred finalizáciou: **keby dnes neexistoval ani riadok kódu 
 
 ## 16. Inkrementálny implementačný plán
 
-- **M1 — Uzavretý pamäťový okruh** (najbližší míľnik, ~3–5 dní čistej práce; **zámerne úzky — jediný cieľ je uzavrieť tok agent číta → pracuje → zapisuje → iný agent pokračuje**):
+- **M1 — Uzavretý pamäťový okruh** (**dokončený a live-accepted 2026-07-13**; zámerne úzky — jediný cieľ je uzavrieť tok agent číta → pracuje → zapisuje → iný agent pokračuje):
   0. **Rozhodnutie o izolácii (pred kódom):** samostatná Personal a WORK inštancia (preferované; dva journaly, dva MCP profily, zero-leak konštrukciou) vs. ponechanie riadkovej sensitivity policy. Výsledok sa po kroku 1 zapíše ako prvý decision record cez nové API (bootstrap obsahu).
   1. Write kontrakt v `brain` knižnici: `record_outcome`, `record_decision` (+ candidate pásmo pre `remember`), validácia, secret filter, idempotencia — journal už všetko unesie.
   2. Schema bump: decision payload v2 (alternatívy/reopen), type enum + `problem`/`analysis`, `record://` linky.
@@ -284,16 +286,7 @@ Po 4 týždňoch od M1 (rozšírenie existujúceho checkpointu [repo]):
 
 ## Záver
 
-- **Odporúčaný najbližší krok:** schváliť tento dokument, rozhodnúť M1 krok 0 (izolácia — preferovane samostatná Personal a WORK inštancia) a začať krok 1 (write kontrakt v `brain` knižnici) — návrhovo malý, plne krytý existujúcim journalom a policy dizajnom z P002 §10.
-- **Otázky rozhodnúť pred implementáciou:**
-  1. **Izolácia sensitive/WORK dát:** potvrdiť preferovaný variant dvoch samostatných inštancií (Personal Brain + WORK Brain), alebo ponechať riadkovú sensitivity policy? (M1 krok 0 — blokuje write cestu.)
-  2. **Kontrakt v2 scope:** potvrdiť zrušenie povinného `workspaces` (default z profilu agenta, per-call len zúženie) ako zmenu read kontraktu z P006 §5, vrátane úpravy parity testov.
-  3. Record→record linky: `record://` URI v `artifact_links` (odporúčané) vs. nová tabuľka?
-  4. Majú write nástroje v M1 dostať všetci traja agenti, alebo začať len s jedným (odporúčam: Claude + Hermes, Codex po oprave smoke)?
-  5. Kto schvaľuje candidates v M2 — CLI, alebo agentom sprostredkovaný review? (M1 žije s pending candidates.)
-  6. Jazyk kanonických recordov: SK, EN, alebo zmes ako doteraz? (Ovplyvňuje Slice 5 model bake-off kvóty.)
-  7. Platí pre write cestu rovnaký „no tuning"/gate režim evidencie ako pre retrieval (live evidence JSON per míľnik)?
-- **Názov prvého implementačného míľnika:** **M1 — Uzavretý pamäťový okruh** (Closed memory loop).
-- **Návrh commit message:** `docs: reassess Pavol-Brain direction — agent-first shared memory, close the read-write loop (M1)`
+- **M1:** uzavretý a prijatý; jeho architektonické rozhodnutia sú normatívne zaznamenané v [ADR-001](adr-001-m1-live-acceptance.md).
+- **Ďalší krok:** vedome vyberať iba z otvoreného [M2 backlogu](m2-roadmap.md), bez spätnej zmeny rozsahu M1.
 
-*Dokument je finálny rozhodovací podklad; implementuje a commituje sa až po schválení otázok vyššie.*
+*Tento dokument zostáva rozhodovacím podkladom, ktorého M1 závery boli potvrdené live acceptance.*

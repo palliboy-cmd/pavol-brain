@@ -1,6 +1,6 @@
 # Proposal 007: Decision Audit, External Alternatives, and Devil's Advocate Review
 
-- **Status:** Analysis only — nothing implemented, nothing decided
+- **Status:** Analysis only at publication; D9 was subsequently implemented and live-accepted in M1 (2026-07-13)
 - **Dátum:** 2026-07-12
 - **Autor:** Claude (Fable 5) na základe zadania Pavla Pavlovského
 - **Vstupy:** Proposals 001–006 · `spike/DECISION.md` · `sqlite-spike/DECISION.md` · web rešerš (overené 2026-07-12, zdroje v §8)
@@ -30,7 +30,7 @@ Diablov advokát v §5 je písaný vážne: každý protiargument je formulovan�
 | D6 | Benchmark preflight: oprava 20/24 nekonzistentných queries pred meraním; pôvodný manifest immutable | P005 §4 | vykonané |
 | D7 | Výsledný verdikt: **GO WITH CONDITIONS — vector-only**; FTS-only neprešiel (top-3 70,83 %), hybrid RRF prešiel ale neselektovaný (95,83 % < 100 %); S4 noise FAIL 10,53 % | `sqlite-spike/DECISION.md` | uzavreté s podmienkami |
 | D8 | Podmienky: rozšíriť benchmark, znovu merať noise na nezávislej sade, žiadny tuning na 24 queries, provenance povinná, retrieval bez mutácií | `sqlite-spike/DECISION.md` | otvorené (blokujú „production" label) |
-| D9 | Integračná vrstva: `brain.*` kontrakt, Python library first + MCP adaptér v Slice 4; fail-closed pri výpadku embeddings; mini-core single host, žiadny multi-master | P006 | draft, neimplementované |
+| D9 | Integračná vrstva: `brain.*` kontrakt, Python library first + MCP adaptér v Slice 4; fail-closed pri výpadku embeddings; mini-core single host, žiadny multi-master | P006 | implementované a live-accepted v M1 |
 | D10 | Embedding model: `nomic-embed-text:latest`, zafixovaný fingerprintom | P005, P006 | implicitne prijaté — **nikdy nebolo samostatne rozhodované** |
 
 Poznámka k D10: je to jediné rozhodnutie v zozname, ktoré nevzniklo vedomým porovnaním alternatív — model bol zdedený z Graphiti spiku, kde bol zvolený ako „čo beží lokálne v Ollame". [úsudok] To z neho robí najslabšie ukotvené rozhodnutie celej série.
