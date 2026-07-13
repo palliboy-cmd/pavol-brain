@@ -1,7 +1,7 @@
 PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS memory_records (
  record_id TEXT PRIMARY KEY, schema_version INTEGER NOT NULL DEFAULT 1,
- type TEXT NOT NULL CHECK(type IN ('decision','outcome','fact','correction','artifact_link','preference')),
+ type TEXT NOT NULL CHECK(type IN ('problem','analysis','decision','outcome','fact','correction','artifact_link','preference')),
  workspace TEXT NOT NULL, sensitivity TEXT NOT NULL CHECK(sensitivity IN ('normal','sensitive')),
  raw_input TEXT NOT NULL, payload TEXT NOT NULL, content_hash TEXT NOT NULL,
  idempotency_key TEXT NOT NULL UNIQUE, agent_id TEXT NOT NULL,
@@ -30,3 +30,4 @@ CREATE TABLE IF NOT EXISTS graph_edges (
 CREATE TABLE IF NOT EXISTS projection_map (
  record_id TEXT NOT NULL, build_id TEXT NOT NULL, episode_uuid TEXT, PRIMARY KEY(record_id,build_id)
 );
+PRAGMA user_version=2;

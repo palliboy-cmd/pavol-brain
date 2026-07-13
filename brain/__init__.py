@@ -8,3 +8,7 @@ def get_record(record_id,**kwargs): return _default.get_record(record_id,**kwarg
 def get_related(record_id,**kwargs): return _default.get_related(record_id,**kwargs)
 def health(): return _default.health()
 def rebuild_status(): return _default.rebuild_status()
+def record_outcome(**kwargs): return _default.record_outcome(**kwargs)
+def record_decision(**kwargs): return _default.record_decision(**kwargs)
+def record_problem(**kwargs): return _default.record_problem(**kwargs)
+def record_analysis(**kwargs): return _default.record_analysis(**kwargs)

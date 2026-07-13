@@ -6,8 +6,8 @@ class ContractModel(BaseModel):
 
 class SearchRequest(ContractModel):
     query: str
-    workspaces: list[str]
-    types: list[Literal["decision","outcome","fact","preference","artifact_link","correction"]] | None = None
+    workspaces: list[str] | None = None
+    types: list[Literal["problem","analysis","decision","outcome","fact","preference","artifact_link","correction"]] | None = None
     mode: Literal["current","historical"] = "current"
     as_of: str | None = None
     sensitive_allowed: bool = False
@@ -78,3 +78,73 @@ class RebuildStatus(ContractModel):
 
 class BrainErrorModel(ContractModel):
     code: str; message: str; request_id: str; details: dict[str, Any] = Field(default_factory=dict)
+
+SourceAssertion = Literal[
+    "explicit_user_command", "explicit_user_confirmation", "verified_tool_result",
+    "authoritative_document", "agent_inference", "imported_curated",
+]
+RecordRelation = Literal["addresses", "analyzes", "decides", "implements", "results_in", "caused_by"]
+
+class RecordLink(ContractModel):
+    target_record_id: str
+    relation: RecordRelation
+
+class WriteMetadata(ContractModel):
+    workspace: str | None = None
+    sensitivity: Literal["normal", "sensitive"] = "normal"
+    source_assertion: SourceAssertion = "agent_inference"
+    source_excerpt: str | None = Field(default=None, max_length=500)
+    source_ref: str | None = None
+    session_ref: str | None = None
+    valid_at: str | None = None
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
+    supersedes: str | None = None
+    change_reason: str | None = None
+    links: list[RecordLink] = Field(default_factory=list)
+
+class OutcomeRequest(WriteMetadata):
+    summary: str = Field(min_length=1, max_length=2000)
+    changes: list[str] = Field(default_factory=list, max_length=100)
+    verification: dict[str, str] = Field(default_factory=dict)
+    open_questions: list[str] = Field(default_factory=list, max_length=100)
+    artifacts: list[str] = Field(default_factory=list, max_length=100)
+    commit: str | None = None
+
+class DecisionAlternative(ContractModel):
+    option: str = Field(min_length=1, max_length=2000)
+    verdict: Literal["accepted", "rejected", "deferred"]
+    reason: str = Field(min_length=1, max_length=4000)
+    reopen_when: str | None = Field(default=None, max_length=4000)
+    evidence: list[str] = Field(default_factory=list, max_length=100)
+
+class DecisionRequest(WriteMetadata):
+    statement: str = Field(min_length=1, max_length=4000)
+    rationale: str = Field(min_length=1, max_length=8000)
+    alternatives: list[DecisionAlternative] = Field(default_factory=list, max_length=100)
+    verdict: Literal["accepted", "rejected", "deferred"] = "accepted"
+    reason: str = Field(min_length=1, max_length=4000)
+    reopen_when: str | None = Field(default=None, max_length=4000)
+    evidence: list[str] = Field(default_factory=list, max_length=100)
+
+class ProblemRequest(WriteMetadata):
+    statement: str = Field(min_length=1, max_length=4000)
+    impact: str = Field(min_length=1, max_length=8000)
+    evidence: list[str] = Field(default_factory=list, max_length=100)
+
+class AnalysisRequest(WriteMetadata):
+    summary: str = Field(min_length=1, max_length=4000)
+    findings: list[str] = Field(min_length=1, max_length=100)
+    evidence: list[str] = Field(default_factory=list, max_length=100)
+
+class WriteResponse(ContractModel):
+    request_id: str
+    record_id: str
+    event_id: str
+    type: Literal["problem", "analysis", "decision", "outcome"]
+    workspace: str
+    status: Literal["accepted", "candidate"]
+    review: Literal["auto_accepted", "human_approved", "pending"]
+    policy_band: Literal["A", "B"]
+    idempotent: bool
+    created_at: str
+    projection_pending: bool = True

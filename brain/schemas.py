@@ -1,8 +1,9 @@
 import json
 from pathlib import Path
-from .models import SearchRequest,SearchResponse,RecordEnvelope,RelatedResponse,HealthReport,RebuildStatus,BrainErrorModel
+from .models import SearchRequest,SearchResponse,RecordEnvelope,RelatedResponse,HealthReport,RebuildStatus,BrainErrorModel,OutcomeRequest,DecisionRequest,ProblemRequest,AnalysisRequest,WriteResponse
 
-MODELS={"SearchRequest":SearchRequest,"SearchResponse":SearchResponse,"RecordEnvelope":RecordEnvelope,"RelatedResponse":RelatedResponse,"HealthReport":HealthReport,"RebuildStatus":RebuildStatus,"BrainError":BrainErrorModel}
+MODELS={"SearchRequest":SearchRequest,"SearchResponse":SearchResponse,"RecordEnvelope":RecordEnvelope,"RelatedResponse":RelatedResponse,"HealthReport":HealthReport,"RebuildStatus":RebuildStatus,"BrainError":BrainErrorModel,
+        "OutcomeRequest":OutcomeRequest,"DecisionRequest":DecisionRequest,"ProblemRequest":ProblemRequest,"AnalysisRequest":AnalysisRequest,"WriteResponse":WriteResponse}
 ROOT=Path(__file__).parent/"schemas"/"v1"
 def generated(): return {name:model.model_json_schema() for name,model in MODELS.items()}
 def export():
