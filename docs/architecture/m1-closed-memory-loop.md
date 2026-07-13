@@ -13,7 +13,7 @@ M1 uses two physical Brain instances with one shared protocol and implementation
 
 This is compatible with the current topology because journal and retrieval paths are already runtime configuration, MCP is stdio per profile, and the projector is single-writer per database. M1 adds an immutable profile-to-instance binding and distinct LaunchAgent labels. It does not add a service, network endpoint, shared database, multi-master writer, or graph.
 
-The canonical mini-core journal was inspected read-only before implementation: 55 records / 157 events, integrity `ok`, no foreign-key violations, schema version 1; workspaces are `abap-object-exporter`, `ai-pos`, `ai-pos-app`, `personal`, `sap-work`, and `smart-timesheet`. Only `sap-work` is marked sensitive. The intended partition is therefore the first five workspaces in Personal and `sap-work` in WORK. It is currently **blocked for live publish** by the legacy payload reference `rec-056.payload.source_record -> rec-001` (`sap-work` -> `ai-pos`). M1 does not rewrite that meaning automatically. The operator must explicitly curate a WORK-local replacement without a cross-instance record reference, or approve another partition that does not weaken the sensitivity boundary. Bootstrap audits documented payload fields, typed `record://` URIs, supersede state and event references and refuses every dangling/cross-partition target.
+The canonical mini-core journal was inspected read-only before implementation: 55 records / 157 events, integrity `ok`, no foreign-key violations, schema version 1; workspaces are `abap-object-exporter`, `ai-pos`, `ai-pos-app`, `personal`, `sap-work`, and `smart-timesheet`. Only `sap-work` is marked sensitive. The intended partition is therefore the first five workspaces in Personal and `sap-work` in WORK. The single legacy blocker is `rec-056.payload.source_record -> rec-001` (`sap-work` -> `ai-pos`). The approved curation is narrow and non-destructive: `rec-001` remains in Personal, `rec-056` is omitted from the new WORK journal, and no replacement knowledge or cross-instance link is created. The legacy journal remains the read-only audit source. Bootstrap audits documented payload fields, typed `record://` URIs, supersede state and event references and refuses every dangling/cross-partition target except this exact, snapshot-bound approval.
 
 The split is a non-destructive export into new v2 journal files. It preserves record, event, materialized state, artifact relation, and artifact-validation identities. It never deletes or updates the legacy journal, and emits a hash/count manifest. Each derived index is then rebuilt from its new journal. Existing profiles migrate to `brain_instance=legacy`, `write_enabled=false`.
 
@@ -64,7 +64,46 @@ Preflight/dry run:
   --manifest /path/to/reviewed-split-manifest.json
 ```
 
-The dry run is expected to stop on `rec-056 -> rec-001` until an explicit operator-curated resolution exists. After reviewing a clean manifest, repeat bootstrap with `--apply`. Bootstrap uses a stable SQLite snapshot, builds both journals in staging, gates integrity/FK/count/partition/reference checks, rechecks the source digest, and publishes the pair with rollback cleanup. Targets must not exist. For any in-place v1 journal migration, `--apply` also requires an explicit unused `--backup` path and automatically restores the verified backup if postflight fails; an already-v2 journal returns before touching the backup path.
+Without `--exclusion-manifest`, the dry run must stop on `rec-056 -> rec-001`. Its operator audit includes the immutable `source_logical_digest`. An operator may then create **only** this exact manifest, replacing the digest and approval values from the read-only preflight:
+
+```json
+{
+  "schema_version": 1,
+  "expected_source_logical_digest": "<digest from the immediately preceding preflight>",
+  "exclusions": [{
+    "record_id": "rec-056",
+    "workspace": "sap-work",
+    "action": "exclude_from_work_split",
+    "reason": "Legacy synthetic artifact relation has no confirmed WORK ownership; source context belongs to Personal.",
+    "approval": {
+      "approved_by": "<operator>",
+      "approved_at": "<ISO-8601 timestamp>",
+      "approval_ref": "<change approval or ticket>"
+    },
+    "expected_reference": {
+      "field_path": "payload.source_record",
+      "target_record_id": "rec-001"
+    }
+  }]
+}
+```
+
+Pass it only as a separate operator-side input; it is never copied to either runtime journal:
+
+```sh
+.venv/bin/python scripts/bootstrap_brain_instances.py \
+  --source /path/to/legacy-journal.db \
+  --personal-journal "$HOME/Library/Application Support/Pavol-Brain/personal/journal.db" \
+  --work-journal "$HOME/Library/Application Support/Pavol-Brain/work/journal.db" \
+  --personal-workspaces abap-object-exporter,ai-pos,ai-pos-app,personal,smart-timesheet \
+  --work-workspaces sap-work \
+  --exclusion-manifest /path/to/approved-rec-056-exclusion.json \
+  --manifest /path/to/reviewed-split-manifest.json
+```
+
+The approved dry run must report 51 Personal records, 3 WORK records, one approved exclusion, and table/event counts calculated from the exact source snapshot. Its operator-audit section lists the omitted record and every omitted event, proves `Personal + WORK + exclusions = legacy`, proves that the record/event IDs remain in legacy, and shows no remaining cross-partition references. The runtime `work` report and journal contain neither `rec-056` nor `rec-001`.
+
+The parser accepts exactly one exclusion: `rec-056` in `sap-work`, action `exclude_from_work_split`, reference path `payload.source_record`, target `rec-001`, and the exact snapshot logical digest. It rejects wildcards, unknown IDs, extra entries, altered payload/reference paths, missing approval metadata, and digest mismatch. After reviewing a clean manifest, repeat the same command with `--apply`. Bootstrap uses a stable SQLite snapshot, builds both journals in staging, gates integrity/FK/count/partition/reference checks, rechecks the source digest, and publishes the pair with rollback cleanup. Targets must not exist. For any in-place v1 journal migration, `--apply` also requires an explicit unused `--backup` path and automatically restores the verified backup if postflight fails; an already-v2 journal returns before touching the backup path.
 
 Build fresh indexes while no new profile is enabled:
 
@@ -97,7 +136,7 @@ Rollback is one unit: disable/revoke new profiles, boot out both M1 projectors, 
 7. Personal cannot request WORK and WORK cannot request Personal;
 8. direct SQL confirms neither journal contains rows from the other instance.
 
-`tests/test_brain_write.py` additionally covers cross-agent duplicate semantics, deterministic artifact/commit verification and audit events, Band C across every persisted client text, scope-safe search links, outcome v2 projection and representative migration hash parity. `tests/test_brain_instance_bootstrap.py` proves that the real-shaped `rec-056 -> rec-001` payload link blocks publish; a separately curated safe fixture proves the 51/4 staging path, source immutability, cleanup, retry, count and integrity gates. Existing contract, projector, historical, artifact-validation, deterministic baseline, and zero-leak suites remain in the full test run.
+`tests/test_brain_write.py` additionally covers cross-agent duplicate semantics, deterministic artifact/commit verification and audit events, Band C across every persisted client text, scope-safe search links, outcome v2 projection and representative migration hash parity. `tests/test_brain_instance_bootstrap.py` proves that the real-shaped `rec-056 -> rec-001` payload link blocks publish without an exception; the exact, digest-bound approved manifest produces the 51/3 split, retains legacy byte-for-byte, enumerates excluded records/events, balances table counts including exclusions, and leaves no target cross-instance reference. It also rejects altered digests, altered payload/reference paths, unknown IDs and extra exclusions. Existing contract, projector, historical, artifact-validation, deterministic baseline, and zero-leak suites remain in the full test run.
 
 ## Deferred
 
