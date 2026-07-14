@@ -4,14 +4,14 @@ This describes the local MBP development checkout only. It is not the authoritat
 
 ## Supported and preferred Python versions
 
-`requires-python = ">=3.11"` in `pyproject.toml`. Python 3.13.13 is the preferred local development runtime; `.python-version` pins it for uv. Python 3.11.x remains supported because it is what mini-core actually runs — do not narrow `requires-python` or introduce 3.13-only syntax without first validating on 3.11, since that would silently break the live deployment's own environment story even though this checkout isn't it.
+`requires-python = ">=3.11"` in `pyproject.toml`. Python 3.14.6 is the preferred local development runtime; `.python-version` pins it for uv. Python 3.11.x remains supported because it is what mini-core actually runs — do not narrow `requires-python` or introduce 3.14-only syntax without first validating on 3.11, since that would silently break the live deployment's own environment story even though this checkout isn't it.
 
 ## Environment setup
 
 Requires `uv` (any reasonably current version; validated with uv 0.11.x) and no other manual Python install — `uv` provisions the pinned interpreter itself.
 
 ```sh
-uv venv .venv --python 3.13
+uv venv .venv --python 3.14
 uv sync --locked --group dev
 ```
 
@@ -49,15 +49,15 @@ BRAIN_STATE_DIR=/tmp/x/state BRAIN_CONTROL_DB=/tmp/x/control.db \
 
 `scripts/run_brain_mcp_ssh.sh` and the `install_brain_*.sh` scripts touch real local machine state (LaunchAgents, `~/Library/LaunchAgents`, `~/bin`) or a real remote host over SSH — do not run them as part of routine local development; they are one-shot operator actions, not dev-loop commands. `tests/test_brain_mcp_launcher.py` exercises the SSH launcher's quoting and error paths safely, by stubbing `ssh` on `PATH` so no network connection is ever made.
 
-## Rollback to Python 3.11
+## Rollback
 
-If the 3.13 `.venv` ever needs to be rolled back locally:
+If the 3.14 `.venv` ever needs to be rolled back locally, restore the immediately preceding validated environment (Python 3.13.13):
 
 ```sh
-mv .venv .venv-py313-failed   # keep for diagnosis unless it holds unsafe state
-mv .venv-py311-backup .venv   # restore the preserved 3.11 environment, if still present
-.venv/bin/python --version    # expect 3.11.15
+mv .venv .venv-py314-failed   # keep for diagnosis unless it holds unsafe state
+mv .venv-py313-backup .venv   # restore the preserved 3.13 environment, if still present
+.venv/bin/python --version    # expect 3.13.13
 uv run pytest tests/          # confirm the baseline still passes
 ```
 
-If `.venv-py311-backup` is no longer present, rebuild it directly: `uv venv .venv --python 3.11 && uv sync --locked --group dev`.
+If `.venv-py313-backup` is no longer present, rebuild it directly: `uv venv .venv --python 3.13 && uv sync --locked --group dev`. A further-back `.venv-py311-backup` (Python 3.11.15, matching mini-core) may also still be present from an earlier migration; the same restore pattern applies to it.
