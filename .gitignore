@@ -1,6 +1,7 @@
 # Local runtime and generated Python state
 .env
 .venv/
+.venv-*/
 **pycache**/
 *.pyc
 *.db
