@@ -3,6 +3,7 @@ import hashlib
 import json
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -51,24 +52,31 @@ class IntegrationProfile:
 
 class ControlStore:
     def __init__(self,path): self.path=Path(path)
+    @contextmanager
     def connect(self):
         self.path.parent.mkdir(parents=True,exist_ok=True); con=sqlite3.connect(self.path)
-        con.row_factory=sqlite3.Row; con.execute("PRAGMA foreign_keys=ON"); con.execute("PRAGMA journal_mode=WAL")
-        con.executescript(SCHEMA)
-        columns={row[1] for row in con.execute("PRAGMA table_info(integrations)")}
-        if "write_enabled" not in columns:con.execute("ALTER TABLE integrations ADD COLUMN write_enabled INTEGER NOT NULL DEFAULT 0")
-        if "brain_instance" not in columns:con.execute("ALTER TABLE integrations ADD COLUMN brain_instance TEXT NOT NULL DEFAULT 'legacy'")
-        con.execute("INSERT OR IGNORE INTO control_schema VALUES(2,?)",(now(),)); con.commit(); return con
+        try:
+            con.row_factory=sqlite3.Row; con.execute("PRAGMA foreign_keys=ON"); con.execute("PRAGMA journal_mode=WAL")
+            con.executescript(SCHEMA)
+            columns={row[1] for row in con.execute("PRAGMA table_info(integrations)")}
+            if "write_enabled" not in columns:con.execute("ALTER TABLE integrations ADD COLUMN write_enabled INTEGER NOT NULL DEFAULT 0")
+            if "brain_instance" not in columns:con.execute("ALTER TABLE integrations ADD COLUMN brain_instance TEXT NOT NULL DEFAULT 'legacy'")
+            con.execute("INSERT OR IGNORE INTO control_schema VALUES(2,?)",(now(),)); con.commit()
+            yield con
+        finally:
+            con.close()
     def _decode(self,row):
         if not row:return None
         d=dict(row)
         for k in ("allowed_workspaces","sensitive_workspace_grants","allowed_tools"):d[k]=json.loads(d[k])
         d["enabled"]=bool(d["enabled"]);d["revoked"]=bool(d["revoked"]);d["write_enabled"]=bool(d["write_enabled"]);return IntegrationProfile(**d)
     def get(self,integration_id):
-        con=self.connect();return self._decode(con.execute("SELECT * FROM integrations WHERE integration_id=?",(integration_id,)).fetchone())
+        with self.connect() as con:
+            return self._decode(con.execute("SELECT * FROM integrations WHERE integration_id=?",(integration_id,)).fetchone())
     def list(self,include_revoked=False):
-        con=self.connect();sql="SELECT * FROM integrations"+("" if include_revoked else " WHERE revoked=0")+" ORDER BY display_name"
-        return [self._decode(r) for r in con.execute(sql)]
+        with self.connect() as con:
+            sql="SELECT * FROM integrations"+("" if include_revoked else " WHERE revoked=0")+" ORDER BY display_name"
+            return [self._decode(r) for r in con.execute(sql)]
     def save(self,profile,actor="Pavol/operator",reason=None):
         if profile.client_type not in CLIENT_TYPES or profile.transport not in TRANSPORTS:raise ValueError("invalid client type or transport")
         if not set(profile.sensitive_workspace_grants)<=set(profile.allowed_workspaces):raise ValueError("sensitive grants must be allowed workspaces")
@@ -79,17 +87,18 @@ class ControlStore:
         if profile.brain_instance=="personal" and not allowed<=PERSONAL_WORKSPACES:raise ValueError("Personal profiles may only use Personal workspaces")
         if profile.brain_instance=="work" and (not allowed<=WORK_WORKSPACES or not allowed<=grants):raise ValueError("WORK profiles require WORK workspaces and matching sensitive grants")
         if profile.brain_instance=="legacy" and (profile.write_enabled or set(profile.allowed_tools)&set(WRITE_TOOLS)):raise ValueError("legacy profiles are read-only")
-        con=self.connect();old=self.get(profile.integration_id); stamp=now()
-        profile.created_at=old.created_at if old else stamp;profile.updated_at=stamp
-        data=asdict(profile);before=policy_hash(asdict(old)) if old else None;after=policy_hash(data)
-        changed=sorted(k for k,v in data.items() if not old or asdict(old).get(k)!=v)
-        values={**data,"enabled":int(profile.enabled),"revoked":int(profile.revoked),"write_enabled":int(profile.write_enabled),**{k:json.dumps(data[k],sort_keys=True) for k in ("allowed_workspaces","sensitive_workspace_grants","allowed_tools")}}
-        columns=list(values); marks=",".join("?"*len(columns)); updates=",".join(f"{x}=excluded.{x}" for x in columns if x not in ("integration_id","created_at"))
-        try:
-            con.execute("BEGIN IMMEDIATE");con.execute(f"INSERT INTO integrations({','.join(columns)}) VALUES({marks}) ON CONFLICT(integration_id) DO UPDATE SET {updates}",[values[x] for x in columns])
-            con.execute("INSERT INTO integration_events VALUES(?,?,?,?,?,?,?,?,?,?)",(str(uuid.uuid4()),profile.integration_id,"created" if not old else "updated",stamp,actor,before,after,json.dumps(changed),reason,json.dumps(data,sort_keys=True)))
-            con.commit()
-        except: con.rollback();raise
+        with self.connect() as con:
+            old=self.get(profile.integration_id); stamp=now()
+            profile.created_at=old.created_at if old else stamp;profile.updated_at=stamp
+            data=asdict(profile);before=policy_hash(asdict(old)) if old else None;after=policy_hash(data)
+            changed=sorted(k for k,v in data.items() if not old or asdict(old).get(k)!=v)
+            values={**data,"enabled":int(profile.enabled),"revoked":int(profile.revoked),"write_enabled":int(profile.write_enabled),**{k:json.dumps(data[k],sort_keys=True) for k in ("allowed_workspaces","sensitive_workspace_grants","allowed_tools")}}
+            columns=list(values); marks=",".join("?"*len(columns)); updates=",".join(f"{x}=excluded.{x}" for x in columns if x not in ("integration_id","created_at"))
+            try:
+                con.execute("BEGIN IMMEDIATE");con.execute(f"INSERT INTO integrations({','.join(columns)}) VALUES({marks}) ON CONFLICT(integration_id) DO UPDATE SET {updates}",[values[x] for x in columns])
+                con.execute("INSERT INTO integration_events VALUES(?,?,?,?,?,?,?,?,?,?)",(str(uuid.uuid4()),profile.integration_id,"created" if not old else "updated",stamp,actor,before,after,json.dumps(changed),reason,json.dumps(data,sort_keys=True)))
+                con.commit()
+            except: con.rollback();raise
         return profile
     def set_enabled(self,integration_id,enabled,actor="Pavol/operator",reason=None):
         p=self.get(integration_id)
@@ -109,13 +118,15 @@ class ControlStore:
         if p.write_enabled:p.allowed_tools.extend(tool for tool in WRITE_TOOLS if tool in selected)
         return self.save(p,actor,reason)
     def history(self,integration_id=None):
-        con=self.connect();q="SELECT * FROM integration_events";args=[]
-        if integration_id:q+=" WHERE integration_id=?";args=[integration_id]
-        return [dict(r) for r in con.execute(q+" ORDER BY occurred_at DESC,event_id DESC",args)]
+        with self.connect() as con:
+            q="SELECT * FROM integration_events";args=[]
+            if integration_id:q+=" WHERE integration_id=?";args=[integration_id]
+            return [dict(r) for r in con.execute(q+" ORDER BY occurred_at DESC,event_id DESC",args)]
     def mark_test(self,integration_id,success,error=None):
         p=self.get(integration_id);p.last_connection_test=now();p.last_connection_test_status="PASS" if success else "FAIL";p.last_error=error;return self.save(p,actor="connection-test",reason="automated connection test")
     def mark_real_call(self,integration_id):
-        con=self.connect();con.execute("UPDATE integrations SET last_successful_real_call=?,updated_at=? WHERE integration_id=?",(now(),now(),integration_id));con.commit()
+        with self.connect() as con:
+            con.execute("UPDATE integrations SET last_successful_real_call=?,updated_at=? WHERE integration_id=?",(now(),now(),integration_id));con.commit()
 
 class RegistryPolicy:
     def __init__(self,store,integration_id,audit=None,instance_id="legacy",runtime_identity=None):self.store,self.integration_id,self.audit,self.instance_id,self.runtime_identity=store,integration_id,audit,instance_id,runtime_identity

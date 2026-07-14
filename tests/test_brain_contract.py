@@ -57,7 +57,8 @@ class BrainContractTests(unittest.TestCase):
   automatic=self.brain.search(**self.request(q));self.assertTrue(automatic.request_id.startswith("uuid4-compat:"))
  def test_missing_database_does_not_create_file(self):
   path=Path(tempfile.mkdtemp())/"missing.db";repo=Repository(BrainConfig(retrieval_db_path=path,journal_db_path=path))
-  with self.assertRaises(BrainError) as err:repo.retrieval()
+  with self.assertRaises(BrainError) as err:
+   with repo.retrieval():pass
   self.assertEqual(err.exception.code,"BRAIN_INDEX_UNAVAILABLE");self.assertFalse(path.exists())
  def test_min_score_disabled(self):
   q=REPORT["queries"][0]

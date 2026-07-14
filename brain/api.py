@@ -103,7 +103,8 @@ class Brain:
         return filtered
     def _meta(self):
         if hasattr(self.repository,"meta"): return self.repository.meta
-        con=self.repository.retrieval();raw=con.execute("SELECT value FROM retrieval_embedding_meta WHERE key='contract'").fetchone()
+        with self.repository.retrieval() as con:
+            raw=con.execute("SELECT value FROM retrieval_embedding_meta WHERE key='contract'").fetchone()
         contract=json.loads(raw[0]) if raw else {};return {"build_id":contract.get("build_id","baseline"),"embedding_model":contract.get("exact_model_identifier",contract.get("fingerprint",self.config.embedding_model)),"contract":contract}
     def health(self):
         report=HealthReport(**RuntimeInspector(self.config,self._meta).inspect())

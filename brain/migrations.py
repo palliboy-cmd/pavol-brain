@@ -2,6 +2,7 @@
 import hashlib
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,19 +19,20 @@ def _digest_rows(con, table):
 
 def inspect_m1(path):
     path=Path(path)
-    con=sqlite3.connect(path.resolve().as_uri()+"?mode=ro",uri=True);con.row_factory=sqlite3.Row
-    tables={row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    required={"memory_records","memory_events","record_state","artifact_links"}
-    missing=sorted(required-tables)
-    integrity=con.execute("PRAGMA integrity_check").fetchone()[0]
-    foreign_keys=[tuple(row) for row in con.execute("PRAGMA foreign_key_check")]
-    types={row[0]:row[1] for row in con.execute("SELECT type,count(*) FROM memory_records GROUP BY type")} if not missing else {}
-    sql=con.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='memory_records'").fetchone()
-    table_digests={table:_digest_rows(con,table) for table in PRESERVED_TABLES if table in tables}
-    combined=hashlib.sha256(json.dumps(table_digests,sort_keys=True).encode()).hexdigest()
-    return {"path":str(path),"missing_tables":missing,"integrity_check":integrity,"foreign_key_violations":foreign_keys,
-            "types":types,"record_count":sum(types.values()),"already_m1":bool(sql and "'problem'" in sql[0] and "'analysis'" in sql[0]),
-            "record_digest":table_digests.get("memory_records"),"table_digests":table_digests,"canonical_digest":combined}
+    with closing(sqlite3.connect(path.resolve().as_uri()+"?mode=ro",uri=True)) as con:
+        con.row_factory=sqlite3.Row
+        tables={row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        required={"memory_records","memory_events","record_state","artifact_links"}
+        missing=sorted(required-tables)
+        integrity=con.execute("PRAGMA integrity_check").fetchone()[0]
+        foreign_keys=[tuple(row) for row in con.execute("PRAGMA foreign_key_check")]
+        types={row[0]:row[1] for row in con.execute("SELECT type,count(*) FROM memory_records GROUP BY type")} if not missing else {}
+        sql=con.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='memory_records'").fetchone()
+        table_digests={table:_digest_rows(con,table) for table in PRESERVED_TABLES if table in tables}
+        combined=hashlib.sha256(json.dumps(table_digests,sort_keys=True).encode()).hexdigest()
+        return {"path":str(path),"missing_tables":missing,"integrity_check":integrity,"foreign_key_violations":foreign_keys,
+                "types":types,"record_count":sum(types.values()),"already_m1":bool(sql and "'problem'" in sql[0] and "'analysis'" in sql[0]),
+                "record_digest":table_digests.get("memory_records"),"table_digests":table_digests,"canonical_digest":combined}
 
 def migrate_m1(path, backup_path):
     path=Path(path);before=inspect_m1(path)
