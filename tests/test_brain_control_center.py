@@ -31,7 +31,7 @@ def test_empty_malformed_audit_and_test_usage_separation(tmp_path):
 def test_generated_config_is_profile_specific(tmp_path):
  for client in ("hermes","codex","claude","custom_mcp"):
   p=IntegrationProfile("future","Future",client,"ssh_stdio","mini",False,["personal"],[],list(READ_TOOLS),"future",brain_instance="personal")
-  cfg=generated_config(p);assert "future" in cfg and "run_brain_mcp_ssh.sh" in cfg and "PRIVATE" not in cfg
+  cfg=generated_config(p);assert "future" in cfg and "run_brain_mcp_ssh.sh" in cfg and "BRAIN_MCP_SSH_HOST" in cfg and "BRAIN_MCP_REMOTE_ROOT" in cfg and "PRIVATE" not in cfg
 
 def test_add_forms_offer_only_instance_compatible_workspaces(tmp_path):
  text=app(tmp_path).add_form();personal,work=text.split("<h2>Work</h2>")
@@ -41,7 +41,14 @@ def test_add_forms_offer_only_instance_compatible_workspaces(tmp_path):
 def test_claude_config_targets_effective_user_scoped_cowork_configuration():
  p=IntegrationProfile("claude","Claude","claude","ssh_stdio","mini",True,["ai-pos"],[],list(READ_TOOLS),"claude",brain_instance="personal")
  cfg=generated_config(p)
- assert "claude mcp add -s user" in cfg and '"type": "stdio"' in cfg and "BRAIN_INTEGRATION_ID=claude" in cfg and "BRAIN_INSTANCE=personal" in cfg
+ assert "claude mcp add -s user" in cfg and '"type": "stdio"' in cfg and "BRAIN_INTEGRATION_ID=claude" in cfg and "BRAIN_INSTANCE=personal" in cfg and "BRAIN_MCP_REMOTE_ROOT" in cfg
+
+def test_generated_cli_configuration_quotes_paths_with_spaces(monkeypatch):
+ monkeypatch.setenv("BRAIN_MCP_REMOTE_ROOT","/tmp/remote root")
+ monkeypatch.setenv("BRAIN_MCP_CLIENT_LAUNCHER","/tmp/client launcher")
+ p=IntegrationProfile("claude","Claude","claude","ssh_stdio","mini",True,["personal"],[],list(READ_TOOLS),"claude",brain_instance="personal")
+ cfg=generated_config(p)
+ assert "'BRAIN_MCP_REMOTE_ROOT=/tmp/remote root'" in cfg and "'/tmp/client launcher'" in cfg
 
 def test_csrf_post_only_and_lifecycle(tmp_path):
  a=app(tmp_path);srv=ThreadingHTTPServer(("127.0.0.1",0),handler(a));threading.Thread(target=srv.serve_forever,daemon=True).start();base=f"http://127.0.0.1:{srv.server_port}"

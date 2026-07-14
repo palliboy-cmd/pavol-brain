@@ -2,6 +2,7 @@
 import html
 import json
 import os
+import shlex
 import asyncio
 import hashlib
 import secrets
@@ -118,10 +119,15 @@ class App:
         h=self.brain.health();r=self.brain.rebuild_status();return self.layout("Runtime",f'<h2>Health</h2><pre>{esc(h.model_dump_json(indent=2))}</pre><h2>Projector/build</h2><pre>{esc(r.model_dump_json(indent=2))}</pre><p>LaunchAgent cadence: 300 seconds. Runtime state, locks, logs and backups are outside Git.</p>')
 
 def generated_config(p):
-    root=Path(os.getenv("BRAIN_CLIENT_ROOT",Path(__file__).resolve().parents[1]));cmd=str(root/"scripts/run_brain_mcp_ssh.sh");env={"BRAIN_INTEGRATION_ID":p.integration_id,"BRAIN_INSTANCE":p.brain_instance}
-    if p.client_type=="hermes":return f"hermes mcp add {p.integration_id} --command {cmd} --env BRAIN_INTEGRATION_ID={p.integration_id} --env BRAIN_INSTANCE={p.brain_instance}"
-    if p.client_type=="codex":return f"codex mcp add {p.integration_id} --env BRAIN_INTEGRATION_ID={p.integration_id} --env BRAIN_INSTANCE={p.brain_instance} -- {cmd}"
-    if p.client_type=="claude":return f"claude mcp add -s user {p.integration_id} -e BRAIN_INTEGRATION_ID={p.integration_id} -e BRAIN_INSTANCE={p.brain_instance} -- {cmd}\n\n"+json.dumps({"mcpServers":{p.integration_id:{"type":"stdio","command":cmd,"args":[],"env":env}}},indent=2)
+    remote_root=os.getenv("BRAIN_MCP_REMOTE_ROOT",str(Path(__file__).resolve().parents[1]))
+    launcher=Path(os.getenv("BRAIN_MCP_CLIENT_LAUNCHER",str(Path.home()/"bin"/"run_brain_mcp_ssh.sh")))
+    host=os.getenv("BRAIN_MCP_SSH_HOST","mini" if p.host in {"","mini-core"} else p.host)
+    cmd=str(launcher);env={"BRAIN_INTEGRATION_ID":p.integration_id,"BRAIN_INSTANCE":p.brain_instance,"BRAIN_MCP_SSH_HOST":host,"BRAIN_MCP_REMOTE_ROOT":remote_root};q=shlex.quote
+    env_args=" ".join(f"--env {q(f'{key}={value}')}" for key,value in env.items())
+    claude_env_args=" ".join(f"-e {q(f'{key}={value}')}" for key,value in env.items())
+    if p.client_type=="hermes":return f"hermes mcp add {q(p.integration_id)} --command {q(cmd)} {env_args}"
+    if p.client_type=="codex":return f"codex mcp add {q(p.integration_id)} {env_args} -- {q(cmd)}"
+    if p.client_type=="claude":return f"claude mcp add -s user {q(p.integration_id)} {claude_env_args} -- {q(cmd)}\n\n"+json.dumps({"mcpServers":{p.integration_id:{"type":"stdio","command":cmd,"args":[],"env":env}}},indent=2)
     return json.dumps({"mcpServers":{p.integration_id:{"command":cmd,"args":[],"env":env}}},indent=2)
 
 def handler(app):
