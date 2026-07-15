@@ -8,6 +8,9 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import instance_identity
+from .config import instance_paths
+
 READ_TOOLS = ("brain_search","brain_get_record","brain_get_related","brain_health","brain_rebuild_status")
 WRITE_TOOLS = ("brain_record_outcome","brain_record_decision")
 TOOLS = READ_TOOLS + WRITE_TOOLS
@@ -87,6 +90,19 @@ class ControlStore:
         if profile.brain_instance=="personal" and not allowed<=PERSONAL_WORKSPACES:raise ValueError("Personal profiles may only use Personal workspaces")
         if profile.brain_instance=="work" and (not allowed<=WORK_WORKSPACES or not allowed<=grants):raise ValueError("WORK profiles require WORK workspaces and matching sensitive grants")
         if profile.brain_instance=="legacy" and (profile.write_enabled or set(profile.allowed_tools)&set(WRITE_TOOLS)):raise ValueError("legacy profiles are read-only")
+        if profile.write_enabled and profile.brain_instance in ("personal","work"):
+            # Package 1 (closes B1's profile-vs-bootstrap-state gap): a
+            # write-enabled profile must never be usable before its instance
+            # journal exists and is correctly marked — otherwise the first
+            # real write fails at request time with a confusing
+            # BRAIN_JOURNAL_UNAVAILABLE/BRAIN_INSTANCE_MARKER_MISSING instead
+            # of being refused here, at profile-creation time.
+            journal_path,_=instance_paths(profile.brain_instance)
+            marked=instance_identity.marked_instance_at_path(journal_path)
+            if marked is None:
+                raise ValueError(f"write-enabled {profile.brain_instance} profile requires an existing, marker-stamped journal at {journal_path}; run bootstrap (and the instance stamp backfill for pre-Package-1 journals) first")
+            if marked!=profile.brain_instance:
+                raise ValueError(f"journal at {journal_path} is marked for instance {marked!r}, not {profile.brain_instance!r}")
         with self.connect() as con:
             old=self.get(profile.integration_id); stamp=now()
             profile.created_at=old.created_at if old else stamp;profile.updated_at=stamp

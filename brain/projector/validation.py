@@ -1,9 +1,17 @@
+from brain import instance_identity
 from .cursor import get_cursor
 from .errors import RebuildRequired
 
 
 def validate(con, journal_head, config):
     issues = []
+    # Package 1 (closes B2): a soft, non-raising counterpart to the hard
+    # enforce_retrieval() gate in ProjectionProjector._write() — this lets
+    # read-only inspection (status()/plan()) surface instance drift as an
+    # ordinary REBUILD_REQUIRED issue instead of only failing on the next
+    # write attempt.
+    marker_issue = instance_identity.diagnose_retrieval(con, getattr(config, "instance_id", "legacy"))
+    if marker_issue: issues.append(marker_issue)
     cursor = get_cursor(con)
     if cursor:
         if cursor["projection_schema_version"] != config.projection_schema_version: issues.append("projection_schema_mismatch")

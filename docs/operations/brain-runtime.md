@@ -26,13 +26,61 @@ Before replacing an active index, use SQLite `.backup`, verify `PRAGMA integrity
 
 M1 rollout order is fixed: backup legacy/control state; bootstrap dry-run; operator resolution of every reference finding; staged dual-journal build; digest/partition gate; explicit publish approval; one-shot dual-index build; parity/manifest review; disabled profile creation; read-only smoke; `RegistryPolicy` write smoke against disposable staging journals; plist preparation; final dual activation. On any failure, keep legacy read-only, revoke the new profiles, boot out both M1 labels and remove only unpublished/staging outputs. Published M1 files are retained for forensics until the operator explicitly removes them.
 
+## Instance identity marker and bootstrap recovery (Package 1)
+
+Every Personal and WORK journal carries a persisted `brain_instance_identity` singleton row (`instance_id`, `created_at`, `source_digest`), stamped once by `scripts/bootstrap_brain_instances.py`'s `build()` inside the same transaction as the initial data copy. `JournalWriter.connect()`, `Repository.journal()`/`Repository.retrieval()`, and the projector's `JournalReader.connect()`/`ProjectionProjector._write()` all refuse before running any query when a `personal`/`work`-configured connection's marker disagrees with what it opened: `BRAIN_INSTANCE_MISMATCH` for a wrong instance, `BRAIN_INSTANCE_MARKER_MISSING` for a journal that predates this marker. `legacy`/spike configurations are exempt by design. Retrieval databases are fully derived and disposable, so the projector is additionally allowed to *stamp* a genuinely empty (never-projected) retrieval database's `retrieval_embedding_meta['instance_id']` key itself, the first time it writes to it — a journal never gets this self-stamping behavior, because it is the source of truth, not a derived index.
+
+`brain/control.py`'s `ControlStore.save()` refuses to persist a `write_enabled=True` profile for `brain_instance` `personal`/`work` unless `instance_paths(brain_instance)` already resolves to an existing, correctly-marked journal — a write grant can no longer be created for an instance that was never bootstrapped.
+
+### One-time backfill for pre-Package-1 journals
+
+A journal built before Package 1 has no marker and will refuse every write and read. Stamp it once, per instance, with `scripts/stamp_brain_instance.py`:
+
+```sh
+# Dry run first — never mutates anything.
+.venv/bin/python scripts/stamp_brain_instance.py --journal-db "$HOME/Library/Application Support/Pavol-Brain/personal/journal.db" --instance-id personal
+.venv/bin/python scripts/stamp_brain_instance.py --journal-db "$HOME/Library/Application Support/Pavol-Brain/work/journal.db" --instance-id work
+
+# Apply — backs up the journal first (`<journal>.pre-instance-stamp-backup.db`), verifies the backup's
+# content digest matches, stamps inside its own transaction, then re-verifies the canonical tables
+# (memory_records/memory_events/record_state/artifact_links/artifact_validation_events) are byte-for-byte
+# unchanged before declaring success. Any failure restores the journal from the backup.
+.venv/bin/python scripts/stamp_brain_instance.py --journal-db "$HOME/Library/Application Support/Pavol-Brain/personal/journal.db" --instance-id personal --apply
+.venv/bin/python scripts/stamp_brain_instance.py --journal-db "$HOME/Library/Application Support/Pavol-Brain/work/journal.db" --instance-id work --apply
+```
+
+The tool refuses (exit 2, nothing mutated) rather than guessing when: the journal is missing or fails `PRAGMA integrity_check`; it already carries a marker for a *different* instance; or its `memory_records.workspace` values are not a subset of that instance's workspace partition (`PERSONAL_WORKSPACES`/`WORK_WORKSPACES` in `brain/control.py`). Re-running against an already-stamped journal is a no-op (`already_stamped: true`, exit 0). By default the marker's `source_digest` is the journal's own current logical digest (self-referential — a backfill has no legacy snapshot to bind to); pass `--source-digest` explicitly to record the original bootstrap manifest's digest instead, for continuity with a manifest that predates this marker.
+
+**This backfill has not been run against any live instance journal.** It must be run once per Personal/WORK journal, on the host where they actually live, before this Package 1 code is deployed there — otherwise every write and read against those journals will start failing with `BRAIN_INSTANCE_MARKER_MISSING` the moment the new code is deployed.
+
+### Bootstrap state machine and exit codes
+
+`scripts/bootstrap_brain_instances.py --apply` classifies current on-disk state (marker file, manifest, and the two target journals) before doing anything, per this table (`classify_recovery()`):
+
+| Classification | Meaning | `--apply` action | Exit |
+|---|---|---|---|
+| `fresh` | nothing exists yet | full bootstrap run | 0 (or 2 if preflight audit blocks it) |
+| `already_bootstrapped` | a prior run completed and nothing has diverged since | print the existing manifest, write nothing | 0 |
+| `live` | bootstrap already completed and the instance(s) have since been used normally (new writes exist) | refuse — "bootstrap is not a reset tool" | 3 |
+| `incompatible_existing_state` | a target exists with no marker and no published manifest (foreign file, or exactly one target present) | refuse | 3 |
+| `completed_crash_after_manifest` | crash after the manifest was already written; only the marker cleanup was missed | remove the stale marker, print the manifest | 0 |
+| `crash_after_publish_before_manifest` | both `os.replace` calls succeeded but the process died before the manifest write | write the manifest from the marker's own record of what was published, remove the marker — **never re-verify or touch the published files**, so a legitimate write that landed in the gap is preserved | 0 |
+| `recoverable_partial` | at most a digest-matching remnant of an incomplete publish remains (e.g. only one `os.replace` succeeded before a crash) | delete only the file(s) whose content digest matches what this bootstrap staged, plus `.staging` leftovers and the marker; then proceed as `fresh` | 0 (after cleanup, on a fresh run) |
+| `foreign_corrupted` | a target exists but disagrees with everything this or a prior bootstrap ever recorded | refuse, demand operator inspection | 4 |
+| `incompatible_retry` | the marker's own recorded targets don't match the targets requested this time | refuse | 3 |
+| `corrupted` | a target fails `PRAGMA integrity_check`, or a published manifest's recorded digests don't match reality | refuse | 4 |
+
+Two distinct proof requirements back this table: completing the *manifest write* for `crash_after_publish_before_manifest` only requires that each target's own stamped `brain_instance_identity` marker (`instance_id` + `source_digest`) prove it is this bootstrap's output — content may have changed since (a legitimate write), and that is fine, because nothing is deleted in this branch. *Deleting* a file (`recoverable_partial`) requires an exact content-digest match against what was staged — the higher bar for the higher-risk, irreversible action. Recovery never deletes a file it cannot verify by one of these two proofs, and preflight now also requires the requested `--personal-workspaces`/`--work-workspaces` to equal `brain/control.py`'s `PERSONAL_WORKSPACES`/`WORK_WORKSPACES` exactly (exit 2 via the existing preflight-audit path otherwise) — the workspace partition has one source of truth.
+
+Preflight-audit blocking (missing/overlapping/unknown workspaces, unresolved cross-partition references, count mismatches, integrity/FK failures, partition-constant mismatch) remains a separate `blocked` path with exit code 2, unchanged from before Package 1.
+
 ## Health interpretation
 
 `index_behind` means the projector cursor differs from journal head. `stale_index` becomes true only while behind and the oldest unprojected event exceeds `BRAIN_STALE_AFTER_SECONDS` (default 3600), or the optional `BRAIN_STALE_GAP_EVENTS` threshold is exceeded. A short scheduling delay is healthy-but-behind; stale, endpoint-down, cursor-ahead, or rebuild-required state is degraded. A missing journal or retrieval DB is unavailable.
 
 Endpoint probes are loopback-only, bounded by `BRAIN_ENDPOINT_PROBE_TIMEOUT`, and cached for `BRAIN_ENDPOINT_PROBE_TTL`. Audit logs are metadata-only rotating JSONL when `BRAIN_AUDIT_LOG` is explicitly configured; query text and record bodies are excluded. Debug query logging is intentionally unsupported in the MVP. Retain operational logs according to local machine policy and never commit them.
 
-For stale state, inspect `brain_health`, run a projector plan and validate, then one locked bounded run. For `rebuild_required`, build a fresh disposable index and repeat the backup/parity/atomic-switch process. Projector failures leave the transactional cursor unchanged and the next schedule retries.
+For stale state, inspect `brain_health`, run a projector plan and validate, then one locked bounded run. For `rebuild_required`, build a fresh disposable index and repeat the backup/parity/atomic-switch process — this is also the repair for a retrieval database whose instance marker is missing-with-existing-documents or mismatched (`validate()` surfaces `retrieval_instance_marker_missing`/`retrieval_instance_marker_mismatch` as ordinary rebuild-required issues); a fresh, empty retrieval database is always re-stamped by the next projector run, since it is fully derived and rebuildable from the journal (deterministic rebuildability, I12). Projector failures leave the transactional cursor unchanged and the next schedule retries.
 
 ## Four-week usage checkpoint
 

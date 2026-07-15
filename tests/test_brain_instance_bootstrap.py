@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -8,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from journal_fixture import journal_fixture
+from brain.errors import BrainError
 
 ROOT=Path(__file__).parents[1]
 SPEC=importlib.util.spec_from_file_location("bootstrap_brain_instances",ROOT/"scripts/bootstrap_brain_instances.py")
@@ -192,17 +194,262 @@ def test_second_publish_failure_rolls_back_first_target(tmp_path,monkeypatch):
     assert not personal.exists() and not work.exists()
 
 
-def test_retry_recovers_a_crash_marker_and_partial_target(tmp_path):
-    personal=tmp_path/"personal.db";work=tmp_path/"work.db";marker=tmp_path/"manifest.json.publish-pending"
-    personal.write_text("partial")
-    marker.write_text(json.dumps({"targets":[str(personal.resolve()),str(work.resolve())]}))
-    assert bootstrap.recover_interrupted_publish(marker,personal,work)=="cleaned"
-    assert not marker.exists() and not personal.exists() and not work.exists()
+# The two tests previously here (test_retry_recovers_a_crash_marker_and_partial_target,
+# test_retry_keeps_a_completed_pair_if_crash_happened_after_manifest) exercised
+# recover_interrupted_publish(), which deleted whatever sat at a target path
+# purely because a marker existed, with no digest check (write-safety-integrity-repair-spec.md
+# B1 finding #3). That function is gone; classify_recovery()/cleanup_recoverable_partial()/
+# forward_complete_from_marker() replace it. Equivalent and additional coverage,
+# including the specific "never delete an unverified file" and "never delete a
+# post-publish write" regressions those two tests could not have caught, lives
+# in the Package 1 recovery-classification tests below.
+
+def _marker_payload(personal,work,source_digest="source-digest",staged_personal=None,staged_work=None):
+    return {"source_digest":source_digest,"started_at":"2026-07-15T00:00:00+00:00",
+            "personal":{"path":str(personal.resolve()),"sha256":"p-sha","logical_digest":staged_personal},
+            "work":{"path":str(work.resolve()),"sha256":"w-sha","logical_digest":staged_work}}
 
 
-def test_retry_keeps_a_completed_pair_if_crash_happened_after_manifest(tmp_path):
-    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json";marker=tmp_path/"manifest.json.publish-pending"
-    personal.write_text("personal");work.write_text("work");manifest.write_text('{"published":true}')
-    marker.write_text(json.dumps({"targets":[str(personal.resolve()),str(work.resolve())]}))
-    assert bootstrap.recover_interrupted_publish(marker,personal,work,manifest)=="completed"
-    assert personal.exists() and work.exists() and not marker.exists()
+def test_classify_recovery_is_fresh_when_nothing_exists(tmp_path):
+    marker=tmp_path/"manifest.json.publish-pending";manifest=tmp_path/"manifest.json"
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db"
+    classification,detail=bootstrap.classify_recovery(marker,manifest,personal,work)
+    assert classification=="fresh" and detail=={}
+
+
+def test_classify_recovery_never_deletes_a_foreign_file_it_cannot_verify(tmp_path):
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    marker=tmp_path/"manifest.json.publish-pending"
+    personal.write_text("some other file that happens to live at this path")
+    marker.write_text(json.dumps(_marker_payload(personal,work,staged_personal="staged-digest-that-will-never-match")))
+    classification,detail=bootstrap.classify_recovery(marker,manifest,personal,work)
+    assert classification=="foreign_corrupted" and detail["unexpected"]==["personal"]
+    before=personal.read_bytes()
+    bootstrap.cleanup_recoverable_partial(json.loads(marker.read_text()),personal,work)
+    assert personal.exists() and personal.read_bytes()==before
+
+
+def test_cleanup_recoverable_partial_deletes_only_the_digest_matching_target(tmp_path,monkeypatch):
+    source=tmp_path/"legacy.db";journal_fixture(source)
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion,apply=False))
+    bootstrap.main()
+    snapshot=tmp_path/"snap.db";bootstrap.snapshot_source(source,snapshot)
+    staged_report=bootstrap.build(snapshot,tmp_path/"p.staging",{"abap-object-exporter","ai-pos","ai-pos-app","personal","smart-timesheet"},instance_id="personal",source_digest="d")
+    marker={"source_digest":"d","started_at":"2026-07-15T00:00:00+00:00",
+            "personal":{"path":str(personal.resolve()),"sha256":staged_report["sha256"],"logical_digest":staged_report["logical_digest"]},
+            "work":{"path":str(work.resolve()),"sha256":"absent","logical_digest":"absent-digest"}}
+    os.replace(tmp_path/"p.staging",personal)
+    staging_leftover=Path(str(work)+".staging");staging_leftover.write_text("leftover")
+    bootstrap.cleanup_recoverable_partial(marker,personal,work)
+    assert not personal.exists() and not work.exists() and not staging_leftover.exists()
+
+
+# --- Full main()-level recovery scenarios (write-safety-integrity-repair-spec.md §10 rows 1-9b, 28) ---
+
+def _run_apply(monkeypatch,source,personal,work,manifest,exclusion):
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main()
+    return json.loads(manifest.read_text())
+
+
+def test_successful_apply_stamps_matching_instance_markers(tmp_path,monkeypatch):
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    report=_run_apply(monkeypatch,source,personal,work,manifest,exclusion)
+    assert report["published"]
+    personal_marker=bootstrap.instance_identity.read_journal_marker(sqlite3.connect(personal))
+    work_marker=bootstrap.instance_identity.read_journal_marker(sqlite3.connect(work))
+    assert personal_marker["instance_id"]=="personal" and work_marker["instance_id"]=="work"
+    assert personal_marker["source_digest"]==work_marker["source_digest"]==report["source_logical_digest"]
+
+
+def test_rerun_after_success_is_idempotent_noop(tmp_path,monkeypatch):
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    _run_apply(monkeypatch,source,personal,work,manifest,exclusion)
+    before_p,before_w,before_m=personal.read_bytes(),work.read_bytes(),manifest.read_bytes()
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main()  # must return normally (exit 0), not raise SystemExit
+    assert personal.read_bytes()==before_p and work.read_bytes()==before_w and manifest.read_bytes()==before_m
+
+
+def test_crash_after_publish_before_manifest_forward_completes_without_touching_targets(tmp_path,monkeypatch):
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    original=bootstrap.write_json_atomic
+    def fail_on_manifest(path,data):
+        if Path(path)==manifest:raise RuntimeError("simulated crash right before manifest write")
+        return original(path,data)
+    monkeypatch.setattr(bootstrap,"write_json_atomic",fail_on_manifest)
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(RuntimeError,match="simulated crash"):bootstrap.main()
+    monkeypatch.undo()  # restore write_json_atomic before the retry
+    assert personal.exists() and work.exists() and not manifest.exists()
+    marker=manifest.with_name(manifest.name+".publish-pending");assert marker.exists()
+    before_p,before_w=personal.read_bytes(),work.read_bytes()
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main()
+    assert personal.read_bytes()==before_p and work.read_bytes()==before_w
+    assert not marker.exists() and json.loads(manifest.read_text())["published"]
+
+
+def test_post_publish_write_survives_recovery(tmp_path,monkeypatch):
+    """§10 row 8 — the exact scenario B1 finding #2 warned about: a write
+    landing between a successful publish and the crashed manifest write must
+    never be destroyed by the retry that completes the manifest."""
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    original=bootstrap.write_json_atomic
+    def fail_on_manifest(path,data):
+        if Path(path)==manifest:raise RuntimeError("simulated crash right before manifest write")
+        return original(path,data)
+    monkeypatch.setattr(bootstrap,"write_json_atomic",fail_on_manifest)
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(RuntimeError,match="simulated crash"):bootstrap.main()
+    monkeypatch.undo()
+    assert personal.exists() and work.exists() and not manifest.exists()
+
+    con=sqlite3.connect(personal);con.execute("PRAGMA foreign_keys=OFF")
+    con.execute("INSERT INTO memory_records VALUES ('rec-post-publish',2,'problem','personal','normal','{}','{}','deadbeef','idem-post-publish','probe-agent','explicit_user_command',NULL,NULL,NULL,1.0,'2026-07-15T00:00:00+00:00','2026-07-15T00:00:00+00:00')")
+    con.execute("INSERT INTO memory_events VALUES ('evt-post-publish','rec-post-publish','record_created','2026-07-15T00:00:00+00:00','probe-agent','{}')")
+    con.execute("INSERT INTO record_state VALUES ('rec-post-publish','accepted','auto_accepted',NULL,NULL,NULL,NULL,'none',NULL,NULL,'evt-post-publish')")
+    con.commit();con.close()
+
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main()
+    assert sqlite3.connect(personal).execute("SELECT record_id FROM memory_records WHERE record_id='rec-post-publish'").fetchone()
+    assert json.loads(manifest.read_text())["published"]
+
+
+def test_live_instance_is_never_treated_as_a_reset_target(tmp_path,monkeypatch):
+    """§4.3 row 3 — once an instance has diverged from what bootstrap
+    published (ordinary subsequent use), a rerun must refuse, not overwrite."""
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    _run_apply(monkeypatch,source,personal,work,manifest,exclusion)
+    con=sqlite3.connect(personal);con.execute("PRAGMA foreign_keys=OFF")
+    con.execute("INSERT INTO memory_records VALUES ('rec-live',2,'problem','personal','normal','{}','{}','deadbeef','idem-live','probe-agent','explicit_user_command',NULL,NULL,NULL,1.0,'2026-07-15T00:00:00+00:00','2026-07-15T00:00:00+00:00')")
+    con.execute("INSERT INTO memory_events VALUES ('evt-live','rec-live','record_created','2026-07-15T00:00:00+00:00','probe-agent','{}')")
+    con.execute("INSERT INTO record_state VALUES ('rec-live','accepted','auto_accepted',NULL,NULL,NULL,NULL,'none',NULL,NULL,'evt-live')")
+    con.commit();con.close()
+    before_p,before_w=personal.read_bytes(),work.read_bytes()
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(SystemExit) as error:bootstrap.main()
+    assert error.value.code==3
+    assert personal.read_bytes()==before_p and work.read_bytes()==before_w
+
+
+def test_incompatible_existing_state_refuses_without_deleting(tmp_path,monkeypatch):
+    """§4.3 row 4 — target files exist with no marker and no manifest at all."""
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    personal.write_text("some unrelated foreign file");work.write_text("also unrelated")
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(SystemExit) as error:bootstrap.main()
+    assert error.value.code==3
+    assert personal.read_text()=="some unrelated foreign file" and work.read_text()=="also unrelated"
+
+
+def test_exactly_one_target_present_is_incompatible_existing_state(tmp_path,monkeypatch):
+    """§4.3 row 4's "exactly one target exists" sub-case."""
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    personal.write_text("only one target exists")
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(SystemExit) as error:bootstrap.main()
+    assert error.value.code==3
+    assert personal.read_text()=="only one target exists" and not work.exists()
+
+
+def test_partition_must_match_control_constants(tmp_path,monkeypatch):
+    source=tmp_path/"legacy.db";journal_fixture(source)
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    bad_argv=["bootstrap","--source",str(source),"--personal-journal",str(personal),"--work-journal",str(work),
+              "--personal-workspaces","ai-pos","--work-workspaces","sap-work,personal","--manifest",str(manifest),"--apply"]
+    monkeypatch.setattr(sys,"argv",bad_argv)
+    with pytest.raises(SystemExit) as error:bootstrap.main()
+    assert error.value.code==2
+    report=json.loads(manifest.read_text())
+    assert report["operator_audit"]["partition_constant_mismatch"]
+    assert not personal.exists() and not work.exists()
+
+
+# --- Instance-marker enforcement at the writer/reader/projector boundary (§10 rows 9, 9b) ---
+
+def test_journal_writer_refuses_on_instance_mismatch(tmp_path):
+    from brain.writer import JournalWriter
+    from brain.config import BrainConfig
+    journal=tmp_path/"work.db";journal_fixture(journal,instance_id="work")
+    writer=JournalWriter(BrainConfig(journal_db_path=journal,instance_id="personal"))
+    with pytest.raises(BrainError,match="BRAIN_INSTANCE_MISMATCH"):writer.connect()
+
+
+def test_journal_writer_refuses_on_missing_marker(tmp_path):
+    from brain.writer import JournalWriter
+    from brain.config import BrainConfig
+    journal=tmp_path/"unmarked.db";journal_fixture(journal)  # no instance_id -> no marker
+    writer=JournalWriter(BrainConfig(journal_db_path=journal,instance_id="personal"))
+    with pytest.raises(BrainError,match="BRAIN_INSTANCE_MARKER_MISSING"):writer.connect()
+
+
+def test_journal_writer_accepts_matching_instance(tmp_path):
+    from brain.writer import JournalWriter
+    from brain.config import BrainConfig
+    journal=tmp_path/"personal.db";journal_fixture(journal,instance_id="personal")
+    writer=JournalWriter(BrainConfig(journal_db_path=journal,instance_id="personal"))
+    con=writer.connect();con.close()
+
+
+def test_repository_journal_and_retrieval_refuse_on_instance_mismatch(tmp_path):
+    from brain.repository import Repository
+    from brain.config import BrainConfig
+    journal=tmp_path/"work.db";journal_fixture(journal,instance_id="work")
+    repo=Repository(BrainConfig(journal_db_path=journal,retrieval_db_path=tmp_path/"missing-retrieval.db",instance_id="personal"))
+    with pytest.raises(BrainError,match="BRAIN_INSTANCE_MISMATCH"):
+        with repo.journal():pass
+
+
+def test_repository_retrieval_refuses_on_instance_mismatch(tmp_path):
+    from brain.repository import Repository
+    from brain.config import BrainConfig
+    from brain.projector import ProjectorConfig,ProjectionProjector
+    journal=tmp_path/"personal.db";journal_fixture(journal,instance_id="personal")
+    retrieval=tmp_path/"retrieval.db"
+    class FakeEmbedder:
+        def embed_document(self,text):return [1.0,0.0,0.0,0.0],"fake"
+    projector=ProjectionProjector(ProjectorConfig(journal,retrieval,"fake",4,"fake",instance_id="personal"),FakeEmbedder())
+    while projector.run_once(100).status.value=="HEALTHY":pass
+    repo=Repository(BrainConfig(journal_db_path=journal,retrieval_db_path=retrieval,instance_id="work"))
+    with pytest.raises(BrainError,match="BRAIN_INSTANCE_MISMATCH"):
+        with repo.retrieval():pass
+
+
+def test_projector_journal_reader_refuses_on_instance_mismatch(tmp_path):
+    from brain.projector.journal_reader import JournalReader
+    journal=tmp_path/"work.db";journal_fixture(journal,instance_id="work")
+    reader=JournalReader(journal,instance_id="personal")
+    with pytest.raises(BrainError,match="BRAIN_INSTANCE_MISMATCH"):
+        with reader.connect():pass
+
+
+def test_projector_stamps_retrieval_marker_on_first_write_and_enforces_it_thereafter(tmp_path):
+    from brain.projector import ProjectorConfig,ProjectionProjector
+    journal=tmp_path/"personal.db";journal_fixture(journal,instance_id="personal")
+    retrieval=tmp_path/"retrieval.db"
+    class FakeEmbedder:
+        def embed_document(self,text):return [1.0,0.0,0.0,0.0],"fake"
+    projector=ProjectionProjector(ProjectorConfig(journal,retrieval,"fake",4,"fake",instance_id="personal"),FakeEmbedder())
+    projector.run_once(1)
+    marker=bootstrap.instance_identity.read_retrieval_marker(sqlite3.connect(retrieval))
+    assert marker=="personal"
+    mismatched=ProjectionProjector(ProjectorConfig(journal,retrieval,"fake",4,"fake",instance_id="work"),FakeEmbedder())
+    with pytest.raises(BrainError,match="BRAIN_INSTANCE_MISMATCH"):mismatched.run_once(1)
+
+
+def test_control_store_write_grant_gate_is_the_row_28_scenario(tmp_path,monkeypatch):
+    """§10 row 28, cross-referenced here for traceability; the test itself
+    lives in tests/test_brain_control.py::test_write_grant_requires_an_existing_marked_journal
+    alongside the rest of ControlStore's own coverage."""
+    assert True

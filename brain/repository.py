@@ -2,6 +2,7 @@ import json,sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from .errors import BrainError
+from . import instance_identity
 
 class Repository:
     def __init__(self,config): self.config=config
@@ -18,10 +19,16 @@ class Repository:
             yield con
         finally:
             con.close()
+    @contextmanager
     def retrieval(self):
-        return self._readonly(self.config.retrieval_db_path,"BRAIN_INDEX_UNAVAILABLE","retrieval database is unavailable")
+        with self._readonly(self.config.retrieval_db_path,"BRAIN_INDEX_UNAVAILABLE","retrieval database is unavailable") as con:
+            instance_identity.enforce_retrieval(con,self.config.instance_id,allow_stamp=False)
+            yield con
+    @contextmanager
     def journal(self):
-        return self._readonly(self.config.journal_db_path,"BRAIN_INDEX_UNAVAILABLE","canonical journal is unavailable")
+        with self._readonly(self.config.journal_db_path,"BRAIN_INDEX_UNAVAILABLE","canonical journal is unavailable") as con:
+            instance_identity.enforce_journal(con,self.config.instance_id)
+            yield con
     def workspaces(self):
         with self.retrieval() as con:
             return {r[0] for r in con.execute("SELECT DISTINCT workspace FROM retrieval_documents")}

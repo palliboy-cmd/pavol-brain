@@ -8,6 +8,7 @@
     <string>--timeout</string><string>240</string>
     <string>--journal-db</string><string>__JOURNAL__</string>
     <string>--retrieval-db</string><string>__RETRIEVAL__</string>
+    <string>--instance-id</string><string>__INSTANCE__</string>
     <string>--batch-size</string><string>100</string>
     <string>--embedding-base-url</string><string>http://localhost:11434/v1</string>
     <string>--embedding-model</string><string>nomic-embed-text:latest</string>

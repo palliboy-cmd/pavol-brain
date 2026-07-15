@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""Non-destructive, gated and all-or-nothing split of the legacy journal."""
+"""Non-destructive, gated and all-or-nothing split of the legacy journal.
+
+Package 1 (write-safety-integrity-repair-spec.md §4) adds a digest-aware
+recovery state machine: every crash-recovery decision is made by inspecting
+what is actually on disk against digests this script itself recorded, never
+by unconditionally deleting whatever sits at a target path.
+"""
 import argparse, hashlib, json, os, sqlite3, sys, tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from brain import artifact_validation as av
+from brain import instance_identity
+from brain.control import PERSONAL_WORKSPACES, WORK_WORKSPACES
 from brain.record_references import journal_references
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,9 +29,24 @@ CURATED_EXCLUSION = {
     "target_record_id": "rec-001",
 }
 
+# Recovery classifications (write-safety-integrity-repair-spec.md §4.3) that
+# --apply refuses outright, and the exit code each one uses. "live" and
+# "incompatible_existing_state" mean bootstrap is being asked to act on state
+# it didn't create; "foreign_corrupted"/"corrupted" mean a target or marker
+# disagrees with every digest this script ever recorded. Recovery never
+# deletes anything in any of these classifications.
+BLOCKING_CLASSIFICATIONS = {
+    "live": 3, "incompatible_existing_state": 3, "incompatible_retry": 3,
+    "foreign_corrupted": 4, "corrupted": 4,
+}
+
 
 class CurationError(ValueError):
     pass
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
 
 
 def sha(path):
@@ -209,7 +232,10 @@ def inspect_snapshot(source_path, personal, work):
         con.close()
 
 
-def build(source_path, target_path, workspaces, excluded_records=()):
+def build(source_path, target_path, workspaces, excluded_records=(), *, instance_id, source_digest):
+    """Build one instance's staged journal, ending with its stamped identity
+    marker committed in the same transaction as the copied rows (§4.2 "Instance
+    creation"). ``instance_id`` must be "personal" or "work"."""
     source = readonly(source_path)
     target_path = Path(target_path)
     if target_path.exists():
@@ -225,18 +251,21 @@ def build(source_path, target_path, workspaces, excluded_records=()):
             key = "artifact_record_id" if table == "artifact_validation_events" else "record_id"
             counts[table] = copy_rows(source, target, table, f"{key} IN (SELECT record_id FROM memory_records WHERE {record_where})", record_args)
         av.rebuild_state(target)
+        instance_identity.stamp_journal_marker(target, instance_id, source_digest)
         target.commit()
         integrity = target.execute("PRAGMA integrity_check").fetchone()[0]
         foreign_keys = [tuple(row) for row in target.execute("PRAGMA foreign_key_check")]
         refs=reference_audit(target,set(workspaces),set())
         blocking_refs=[row for row in refs if row["status"]=="blocking"]
-        if integrity != "ok" or foreign_keys or av.verify_state(target) or blocking_refs:
+        marker=instance_identity.read_journal_marker(target)
+        marker_ok=bool(marker) and marker["instance_id"]==instance_id and marker["source_digest"]==source_digest
+        if integrity != "ok" or foreign_keys or av.verify_state(target) or blocking_refs or not marker_ok:
             raise RuntimeError("staging journal validation failed")
         report = {"path": str(target_path), "counts": counts, "integrity_check": integrity,
                   "foreign_key_violations": foreign_keys,
                   "record_references":refs,"cross_partition_references":blocking_refs,
                   "workspaces": [row[0] for row in target.execute("SELECT DISTINCT workspace FROM memory_records ORDER BY workspace")],
-                  "logical_digest": logical_digest(target, TABLES)}
+                  "logical_digest": logical_digest(target, TABLES), "instance_marker": marker}
     except Exception:
         target.rollback()
         target.close()
@@ -267,19 +296,154 @@ def write_json_atomic(path,data):
     os.replace(temporary,path)
 
 
-def recover_interrupted_publish(marker,personal,work,manifest=None):
-    marker=Path(marker)
-    if not marker.exists():return False
-    data=json.loads(marker.read_text())
-    expected={str(Path(personal).resolve()),str(Path(work).resolve())}
-    if set(data.get("targets",[]))!=expected:raise RuntimeError("publish recovery marker does not match requested targets")
-    if manifest and Path(manifest).exists():
-        completed=json.loads(Path(manifest).read_text())
-        if completed.get("published") and Path(personal).exists() and Path(work).exists():
-            marker.unlink();return "completed"
-    for path in (personal,work,Path(str(personal)+".staging"),Path(str(work)+".staging")):
-        Path(path).unlink(missing_ok=True)
-    marker.unlink();return "cleaned"
+# --- Recovery state machine (write-safety-integrity-repair-spec.md §4.3) ---
+
+def inspect_target(path):
+    """Best-effort, read-only inspection of a file that may or may not be a
+    valid journal. Never raises. ``sha256`` is always populated when the file
+    exists; ``logical_digest`` and ``marker`` are populated only when the file
+    is a readable, structurally intact journal — comparisons against them
+    therefore fail safe (a corrupted or foreign file never accidentally
+    matches a recorded digest or identity)."""
+    path = Path(path)
+    if not path.is_file():
+        return None
+    info = {"sha256": sha(path), "logical_digest": None, "integrity_check": None, "marker": None}
+    try:
+        con = readonly(path)
+    except sqlite3.Error:
+        return info
+    try:
+        info["integrity_check"] = con.execute("PRAGMA integrity_check").fetchone()[0]
+        if info["integrity_check"] == "ok":
+            info["logical_digest"] = logical_digest(con, TABLES)
+            info["marker"] = instance_identity.read_journal_marker(con)
+    except sqlite3.Error:
+        pass
+    finally:
+        con.close()
+    return info
+
+
+def _digest_matches(info, recorded_digest):
+    """Strict digest comparison: a missing/unreadable file (``info is None`` or
+    ``info["logical_digest"] is None``) never "matches" a missing recorded
+    digest just because both sides happen to be ``None``. Absence of proof is
+    never treated as proof."""
+    return (info is not None and info["logical_digest"] is not None
+            and recorded_digest is not None and info["logical_digest"] == recorded_digest)
+
+
+def _identity_matches(info, role, source_digest):
+    """Whether ``info``'s own stamped ``brain_instance_identity`` row proves it
+    is the output of the bootstrap run that recorded ``source_digest`` for
+    ``role`` ("personal"/"work") — the same test ``build()`` itself performs
+    before publishing (§4.2 "Instance creation" gate).
+
+    Unlike ``_digest_matches``, this does not require the file's *current*
+    content to be byte-for-byte what was staged: the identity row is written
+    once, inside the same transaction as the initial data copy, and nothing
+    else ever touches it — so it still holds after a legitimate write lands
+    in the journal following a successful publish. Using full-content digest
+    equality here would treat "recovery ran after new data was already
+    written" the same as "this is a different file entirely", and delete or
+    refuse to acknowledge a perfectly valid, already-live instance. Identity
+    proof is exactly what §4.3 row 6 (crash after publish, before the
+    manifest write) needs — the pair *is* published and live the moment
+    ``publish_pair`` succeeds, before this script ever gets to write the
+    manifest describing that fact."""
+    marker = info.get("marker") if info else None
+    return bool(marker) and marker.get("instance_id") == role and marker.get("source_digest") == source_digest and source_digest is not None
+
+
+def classify_recovery(marker_path, manifest_path, personal_path, work_path):
+    """Classify current on-disk state per §4.3's ten-row table. Read-only:
+    never deletes, writes, or modifies anything. Returns ``(classification,
+    detail)``; callers act on the classification."""
+    marker_path = Path(marker_path)
+    manifest_path = Path(manifest_path) if manifest_path else None
+    personal_path = Path(personal_path); work_path = Path(work_path)
+    marker = json.loads(marker_path.read_text()) if marker_path.exists() else None
+    manifest = json.loads(manifest_path.read_text()) if manifest_path and manifest_path.exists() else None
+    personal_info = inspect_target(personal_path)
+    work_info = inspect_target(work_path)
+    published = bool(manifest and manifest.get("published"))
+    result_digests = (manifest or {}).get("result_journal_digests") or {}
+
+    def published_pair_matches():
+        return (_digest_matches(personal_info, result_digests.get("personal"))
+                and _digest_matches(work_info, result_digests.get("work")))
+
+    if marker is None:
+        if personal_info is None and work_info is None:
+            return "fresh", {}
+        if published:
+            if published_pair_matches():
+                return "already_bootstrapped", {"manifest": manifest}
+            return "live", {"personal": personal_info, "work": work_info, "manifest_digests": result_digests}
+        return "incompatible_existing_state", {
+            "personal_exists": personal_info is not None, "work_exists": work_info is not None,
+            "reason": "target file(s) present with no publish-pending marker and no published manifest",
+        }
+
+    expected_targets = {str(personal_path.resolve()), str(work_path.resolve())}
+    marker_targets = {(marker.get("personal") or {}).get("path"), (marker.get("work") or {}).get("path")}
+    if marker_targets != expected_targets:
+        return "incompatible_retry", {"marker_targets": sorted(x for x in marker_targets if x),
+                                       "requested_targets": sorted(expected_targets)}
+
+    if published:
+        if published_pair_matches():
+            return "completed_crash_after_manifest", {}
+        return "corrupted", {"reason": "manifest is published but on-disk targets do not match its recorded digests",
+                              "personal": personal_info, "work": work_info, "manifest_digests": result_digests}
+
+    source_digest = marker.get("source_digest")
+    personal_is_ours = _identity_matches(personal_info, "personal", source_digest)
+    work_is_ours = _identity_matches(work_info, "work", source_digest)
+    if personal_info is not None and work_info is not None and personal_is_ours and work_is_ours:
+        # Both os.replace calls in publish_pair succeeded; the pair is fully
+        # published and may already have legitimate writes in it. Only the
+        # manifest write is missing — complete it, never re-derive or verify
+        # the pair's *current* content against the pre-publish staged digest.
+        return "crash_after_publish_before_manifest", {}
+    unexpected = []
+    if personal_info is not None and not personal_is_ours: unexpected.append("personal")
+    if work_info is not None and not work_is_ours: unexpected.append("work")
+    if unexpected:
+        return "foreign_corrupted", {"unexpected": unexpected, "personal": personal_info, "work": work_info, "marker": marker}
+    return "recoverable_partial", {}
+
+
+def cleanup_recoverable_partial(marker_data, personal_path, work_path):
+    """Delete only files whose digest matches what this bootstrap staged (the
+    digest-verified-own-output rule, I2), plus staging remnants. Never deletes
+    a file it cannot verify — including when the marker itself carries no
+    recorded digest for that side."""
+    for role, path in (("personal", Path(personal_path)), ("work", Path(work_path))):
+        info = inspect_target(path)
+        if _digest_matches(info, (marker_data.get(role) or {}).get("logical_digest")):
+            path.unlink(missing_ok=True)
+        Path(str(path) + ".staging").unlink(missing_ok=True)
+
+
+def forward_complete_from_marker(marker_data, manifest_path):
+    """Row 6: publish_pair already succeeded but the manifest write never
+    happened. Write the manifest from what the marker recorded and stop —
+    never touch the (already correctly published) target files."""
+    personal = marker_data.get("personal") or {}
+    work = marker_data.get("work") or {}
+    report = {
+        "recovered_from": "crash_after_publish_before_manifest",
+        "recovered_at": now_iso(),
+        "source_logical_digest": marker_data.get("source_digest"),
+        "personal": dict(personal),
+        "work": dict(work),
+        "result_journal_digests": {"personal": personal.get("logical_digest"), "work": work.get("logical_digest")},
+        "published": True,
+    }
+    write_json_atomic(manifest_path, report)
+    return report
 
 
 def main():
@@ -294,12 +458,34 @@ def main():
     personal = {x.strip() for x in a.personal_workspaces.split(",") if x.strip()}
     work = {x.strip() for x in a.work_workspaces.split(",") if x.strip()}
     if a.apply and not a.manifest:raise SystemExit("--apply requires --manifest as the publish authority")
+    if a.personal_journal == a.work_journal:raise SystemExit("targets must be distinct")
     marker=a.manifest.with_name(a.manifest.name+".publish-pending") if a.manifest else None
-    recovery=recover_interrupted_publish(marker,a.personal_journal,a.work_journal,a.manifest) if marker else False
-    if recovery=="completed":
-        print(a.manifest.read_text(),end="");return
-    if a.personal_journal == a.work_journal or (a.apply and (a.personal_journal.exists() or a.work_journal.exists())):
-        raise SystemExit("targets must be distinct and must not exist")
+
+    recovery_classification = None
+    if marker is not None:
+        recovery_classification, recovery_detail = classify_recovery(marker, a.manifest, a.personal_journal, a.work_journal)
+        if a.apply:
+            if recovery_classification == "already_bootstrapped":
+                print(a.manifest.read_text(), end=""); return
+            if recovery_classification == "completed_crash_after_manifest":
+                marker.unlink(missing_ok=True)
+                print(a.manifest.read_text(), end=""); return
+            if recovery_classification == "crash_after_publish_before_manifest":
+                marker_data = json.loads(marker.read_text())
+                forward_complete_from_marker(marker_data, a.manifest)
+                marker.unlink(missing_ok=True)
+                print(a.manifest.read_text(), end=""); return
+            if recovery_classification in BLOCKING_CLASSIFICATIONS:
+                blocked_report = {"recovery_classification": recovery_classification, "detail": recovery_detail,
+                                   "personal_journal": str(a.personal_journal), "work_journal": str(a.work_journal)}
+                print(json.dumps(blocked_report, ensure_ascii=False, indent=2))
+                raise SystemExit(BLOCKING_CLASSIFICATIONS[recovery_classification])
+            if recovery_classification == "recoverable_partial":
+                marker_data = json.loads(marker.read_text()) if marker.exists() else {}
+                cleanup_recoverable_partial(marker_data, a.personal_journal, a.work_journal)
+                marker.unlink(missing_ok=True)
+            # "fresh": nothing to clean up; fall through to a normal build.
+
     source_sha_before = sha(a.source)
     with tempfile.TemporaryDirectory(prefix="brain-bootstrap-") as tmp:
         snapshot = Path(tmp) / "source.snapshot.db"
@@ -307,6 +493,8 @@ def main():
         report = {"source": str(a.source), "source_sha256_before": source_sha_before,
                   "source_logical_digest": snapshot_digest, "partition": {"personal": sorted(personal), "work": sorted(work)},
                   **inspect_snapshot(snapshot, personal, work)}
+        if recovery_classification is not None:
+            report["recovery_classification"] = recovery_classification
         source_snapshot = readonly(snapshot)
         try:
             exclusion = None
@@ -362,8 +550,13 @@ def main():
         } for table in TABLES}
         count_mismatches = {table: values for table, values in count_mismatches.items() if values["legacy"] != values["partitioned"]}
         report["operator_audit"]["partition_count_mismatches"] = count_mismatches
+        partition_mismatch = {}
+        if personal != set(PERSONAL_WORKSPACES): partition_mismatch["personal"] = {"requested": sorted(personal), "expected": sorted(PERSONAL_WORKSPACES)}
+        if work != set(WORK_WORKSPACES): partition_mismatch["work"] = {"requested": sorted(work), "expected": sorted(WORK_WORKSPACES)}
+        report["operator_audit"]["partition_constant_mismatch"] = partition_mismatch
         blocked = (report["overlap"] or report["unassigned"] or report["unknown_requested"] or unapproved_refs
-                   or exclusion_error or count_mismatches or report["integrity_check"] != "ok" or report["foreign_key_violations"])
+                   or exclusion_error or count_mismatches or report["integrity_check"] != "ok" or report["foreign_key_violations"]
+                   or partition_mismatch)
         if not blocked and a.apply:
             a.personal_journal.parent.mkdir(parents=True, exist_ok=True); a.work_journal.parent.mkdir(parents=True, exist_ok=True)
             a.manifest.parent.mkdir(parents=True,exist_ok=True)
@@ -371,8 +564,8 @@ def main():
             staged_work = a.work_journal.with_name(a.work_journal.name + ".staging")
             for path in (staged_personal, staged_work): path.unlink(missing_ok=True)
             try:
-                report["personal"] = build(snapshot, staged_personal, personal)
-                report["work"] = build(snapshot, staged_work, work, excluded_ids)
+                report["personal"] = build(snapshot, staged_personal, personal, instance_id="personal", source_digest=snapshot_digest)
+                report["work"] = build(snapshot, staged_work, work, excluded_ids, instance_id="work", source_digest=snapshot_digest)
                 for instance in ("personal","work"):
                     if report[instance]["integrity_check"]!="ok" or report[instance]["foreign_key_violations"] or report[instance]["cross_partition_references"]:
                         raise RuntimeError(f"{instance} staging validation failed")
@@ -389,7 +582,11 @@ def main():
                     raise RuntimeError("legacy source changed during bootstrap")
                 report["source_sha256_after"] = source_sha_after
                 report["result_journal_digests"] = {"personal": report["personal"]["logical_digest"], "work": report["work"]["logical_digest"]}
-                write_json_atomic(marker,{"targets":[str(a.personal_journal.resolve()),str(a.work_journal.resolve())],"source_digest":snapshot_digest})
+                write_json_atomic(marker,{
+                    "source_digest":snapshot_digest,"started_at":now_iso(),
+                    "personal":{"path":str(a.personal_journal.resolve()),"sha256":report["personal"]["sha256"],"logical_digest":report["personal"]["logical_digest"]},
+                    "work":{"path":str(a.work_journal.resolve()),"sha256":report["work"]["sha256"],"logical_digest":report["work"]["logical_digest"]},
+                })
                 try:publish_pair(staged_personal, staged_work, a.personal_journal, a.work_journal)
                 except Exception:
                     marker.unlink(missing_ok=True);raise

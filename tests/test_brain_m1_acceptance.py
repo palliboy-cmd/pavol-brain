@@ -15,6 +15,7 @@ from brain.control import ControlStore,IntegrationProfile,RegistryPolicy,READ_TO
 from brain.projector import ProjectorConfig,ProjectionProjector
 from brain.projector.models import ProjectionStatus
 from brain import artifact_validation as av
+from brain import instance_identity
 
 class QueryTransport:
     def embed(self,text):return [1.0,1.0,1.0,1.0]
@@ -24,24 +25,30 @@ class Embedder:
         seed=int(hashlib.sha256(text.encode()).hexdigest()[:8],16)
         return [float((seed>>(i*4))%11+1) for i in range(4)],"acceptance-fake"
 
-def init_journal(path):
-    con=sqlite3.connect(path);con.executescript((ROOT/"spike/schema/journal.sql").read_text());av.apply_migration(con);con.close()
+def init_journal(path,instance_id):
+    con=sqlite3.connect(path);con.executescript((ROOT/"spike/schema/journal.sql").read_text());av.apply_migration(con)
+    instance_identity.stamp_journal_marker(con,instance_id,"acceptance-fixture-digest");con.commit();con.close()
 
 def brain(journal,retrieval,identity,instance):
     return Brain(BrainConfig(journal_db_path=journal,retrieval_db_path=retrieval,embedding_dimension=4,
                              endpoint_probe_timeout=.01,client_identity=identity,instance_id=instance),QueryTransport())
 
-def project(journal,retrieval):
-    projector=ProjectionProjector(ProjectorConfig(journal,retrieval,"acceptance-fake",4,"acceptance-fake"),Embedder())
+def project(journal,retrieval,instance_id):
+    projector=ProjectionProjector(ProjectorConfig(journal,retrieval,"acceptance-fake",4,"acceptance-fake",instance_id=instance_id),Embedder())
     while projector.run_once(100).status==ProjectionStatus.HEALTHY:pass
 
 def call(server,name,args):
     content=asyncio.run(server.call_tool(name,args));return json.loads(content[0].text)
 
-def test_closed_memory_loop_two_profiles_and_two_instances(tmp_path):
+def test_closed_memory_loop_two_profiles_and_two_instances(tmp_path,monkeypatch):
     personal_journal=tmp_path/"personal-journal.db";personal_retrieval=tmp_path/"personal-retrieval.db"
     work_journal=tmp_path/"work-journal.db";work_retrieval=tmp_path/"work-retrieval.db"
-    init_journal(personal_journal);init_journal(work_journal)
+    # Package 1: ControlStore.save() now requires a write-enabled personal/work
+    # profile's instance_paths() journal to exist and be correctly marked —
+    # point the well-known env vars at this test's own stamped journals.
+    monkeypatch.setenv("BRAIN_PERSONAL_JOURNAL_DB",str(personal_journal))
+    monkeypatch.setenv("BRAIN_WORK_JOURNAL_DB",str(work_journal))
+    init_journal(personal_journal,"personal");init_journal(work_journal,"work")
     store=ControlStore(tmp_path/"control.db")
     def registry_profile(identity,instance,workspaces,sensitive=(),write=False):
         p=IntegrationProfile(identity,identity,"custom_mcp","local_stdio","local",True,list(workspaces),list(sensitive),
@@ -53,7 +60,7 @@ def test_closed_memory_loop_two_profiles_and_two_instances(tmp_path):
     seed=agent_a_brain.record_decision(statement="M1 must close the memory loop",rationale="Agent handoff is the proof",
         alternatives=[],verdict="accepted",reason="final direction",reopen_when=None,evidence=["doc://brain-direction/m1"],
         source_assertion="explicit_user_confirmation",workspace="personal",idempotency_key="seed-context")
-    project(personal_journal,personal_retrieval)
+    project(personal_journal,personal_retrieval,"personal")
     agent_a=create_server(brain=agent_a_brain,policy=registry_profile("agent-a","personal",["personal"],write=True))
 
     loaded=call(agent_a,"brain_search",{"query":"closed memory loop","types":["decision"]})
@@ -72,7 +79,7 @@ def test_closed_memory_loop_two_profiles_and_two_instances(tmp_path):
         "verdict":"accepted","reason":"safe M1 boundary","evidence":["doc://m1/isolation"],
         "source_assertion":"explicit_user_confirmation","idempotency_key":"acceptance-decision"})
     assert decision["status"]=="accepted"
-    project(personal_journal,personal_retrieval)
+    project(personal_journal,personal_retrieval,"personal")
 
     agent_b_brain=brain(personal_journal,personal_retrieval,"agent-b","personal")
     agent_b=create_server(brain=agent_b_brain,policy=registry_profile("agent-b","personal",["personal"]))
@@ -92,7 +99,7 @@ def test_closed_memory_loop_two_profiles_and_two_instances(tmp_path):
     assert sqlite3.connect(work_journal).execute("SELECT sensitivity FROM memory_records WHERE record_id=?",(work_outcome["record_id"],)).fetchone()[0]=="sensitive"
     no_sensitive=create_server(brain=work_brain,policy=CapabilityPolicy(frozenset({"sap-work"}),profile="unsafe-work",write_enabled=True))
     assert call(no_sensitive,"brain_record_outcome",{"summary":"must fail"})["error"]["code"]=="BRAIN_SENSITIVE_SCOPE_DENIED"
-    project(work_journal,work_retrieval)
+    project(work_journal,work_retrieval,"work")
     assert call(agent_a,"brain_search",{"query":"WORK-only","workspaces":["sap-work"]})["error"]["code"]=="BRAIN_WORKSPACE_DENIED"
     assert call(work_server,"brain_search",{"query":"personal M1","workspaces":["personal"]})["error"]["code"]=="BRAIN_WORKSPACE_DENIED"
     assert sqlite3.connect(personal_journal).execute("SELECT count(*) FROM memory_records WHERE workspace='sap-work'").fetchone()[0]==0

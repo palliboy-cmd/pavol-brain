@@ -5,6 +5,7 @@ from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from brain import instance_identity
 from .cursor import get_cursor, set_cursor
 from .embedding_cache import pack
 from .errors import ProjectorError, RebuildRequired
@@ -32,7 +33,7 @@ KNOWN_EVENT_TYPES = {"record_created", "record_approved", "record_rejected", "re
 class ProjectionProjector:
     def __init__(self, config, embedder, failure_injector=None):
         self.config, self.embedder, self.failure_injector = config, embedder, failure_injector
-        self.journal = JournalReader(config.journal_db_path)
+        self.journal = JournalReader(config.journal_db_path, instance_id=config.instance_id)
 
     @contextmanager
     def _write(self):
@@ -53,6 +54,7 @@ class ProjectionProjector:
                 "superseded_by": "ALTER TABLE retrieval_documents ADD COLUMN superseded_by TEXT",
             }.items():
                 if name not in existing: con.execute(sql)
+            instance_identity.enforce_retrieval(con, self.config.instance_id, allow_stamp=True)
             yield con
         finally:
             con.close()

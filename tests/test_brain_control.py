@@ -5,9 +5,16 @@ import pytest
 sys.path.insert(0,str(Path(__file__).parents[1]))
 from brain.control import ControlStore,IntegrationProfile,RegistryPolicy,READ_TOOLS,TOOLS
 from brain.errors import BrainError
+from brain import instance_identity
+
+ROOT=Path(__file__).parents[1]
 
 def profile(i="agent",enabled=False,ws=None,sensitive=None,tools=None):
  return IntegrationProfile(i,i,"custom_mcp","ssh_stdio","mini-core",enabled,ws or ["personal"],sensitive or [],tools or list(READ_TOOLS),i)
+
+def stamped_journal(path,instance_id):
+ con=sqlite3.connect(path);con.executescript((ROOT/"spike/schema/journal.sql").read_text())
+ instance_identity.stamp_journal_marker(con,instance_id,"test-fixture-digest");con.commit();con.close()
 
 def test_lifecycle_fold_and_append_only_history(tmp_path):
  s=ControlStore(tmp_path/"control.db");s.save(profile());s.set_enabled("agent",True,reason="approved");s.revoke("agent",reason="done")
@@ -31,9 +38,18 @@ def test_sensitive_must_be_subset_and_generic_requires_no_source_change(tmp_path
  p=profile("future-agent",True,["personal"],[],["brain_search","brain_health"]);s.save(p)
  assert RegistryPolicy(s,"future-agent").authorize(["personal"]).integration_id=="future-agent"
 
-def test_write_grant_defaults_off_and_instance_is_bound(tmp_path):
+def test_write_grant_requires_an_existing_marked_journal(tmp_path,monkeypatch):
+ s=ControlStore(tmp_path/"control.db")
+ monkeypatch.setenv("BRAIN_PERSONAL_JOURNAL_DB",str(tmp_path/"missing-personal.db"))
+ p=profile("writer",True,tools=list(TOOLS));p.write_enabled=True;p.brain_instance="personal"
+ with pytest.raises(ValueError,match="requires an existing, marker-stamped journal"):s.save(p)
+ stamped_journal(tmp_path/"missing-personal.db","work")
+ with pytest.raises(ValueError,match="is marked for instance 'work'"):s.save(p)
+
+def test_write_grant_defaults_off_and_instance_is_bound(tmp_path,monkeypatch):
  s=ControlStore(tmp_path/"control.db");s.save(profile(enabled=True))
  with pytest.raises(BrainError,match="BRAIN_WRITE_DISABLED"):RegistryPolicy(s,"agent").authorize(["personal"],tool="brain_record_outcome")
+ monkeypatch.setenv("BRAIN_PERSONAL_JOURNAL_DB",str(tmp_path/"personal.db"));stamped_journal(tmp_path/"personal.db","personal")
  p=profile("writer",True,tools=list(TOOLS));p.write_enabled=True;p.brain_instance="personal";s.save(p)
  with pytest.raises(BrainError,match="BRAIN_INSTANCE_DENIED"):RegistryPolicy(s,"writer",instance_id="work").authorize(["personal"],tool="brain_record_outcome")
  with pytest.raises(BrainError,match="BRAIN_IDENTITY_MISMATCH"):RegistryPolicy(s,"writer",instance_id="personal",runtime_identity="impostor").authorize(["personal"],tool="brain_record_outcome")

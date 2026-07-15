@@ -16,9 +16,11 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "sqlite-spike" / "scripts"))
 
 from brain import artifact_validation as av
+from brain import instance_identity
 from fts_baseline import source_records
 
 FIXTURE_EFFECTIVE_AT = "2026-07-10T00:00:00+00:00"
+FIXTURE_SOURCE_DIGEST = "fixture-source-digest"
 
 
 def add_validation_event(con, record_id, artifact_uri, relation, state, reason_code, effective_at=FIXTURE_EFFECTIVE_AT, actor="fixture", note="fixture decision", key_suffix=""):
@@ -29,7 +31,15 @@ def add_validation_event(con, record_id, artifact_uri, relation, state, reason_c
     return lid
 
 
-def journal_fixture(path, records=None, with_validation=True):
+def journal_fixture(path, records=None, with_validation=True, instance_id=None):
+    """``instance_id`` (Package 1): when given ("personal"/"work"), stamps the
+    fixture journal's ``brain_instance_identity`` marker so it can be opened by
+    a matching-instance ``BrainConfig``/``ProjectorConfig`` without tripping
+    the marker enforcement added in write-safety-integrity-repair-spec.md §3
+    B2. Default fixture content spans both Personal and WORK workspaces
+    (mirroring the real pre-split legacy journal shape) — that is intentional
+    and unrelated to this stamp; it only asserts "this file's marker says X",
+    the same narrow thing production enforcement checks."""
     schema = (ROOT / "spike/schema/journal.sql").read_text()
     con = sqlite3.connect(path)
     con.executescript(schema)
@@ -56,5 +66,7 @@ def journal_fixture(path, records=None, with_validation=True):
                                  "verified_active" if valid else "verified_inactive",
                                  "manual_verified" if valid else "wrong_target")
         av.rebuild_state(con)
+    if instance_id is not None:
+        instance_identity.stamp_journal_marker(con, instance_id, FIXTURE_SOURCE_DIGEST)
     con.commit()
     con.close()

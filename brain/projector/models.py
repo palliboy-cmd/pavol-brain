@@ -20,6 +20,10 @@ class ProjectorConfig:
     embedding_model_identifier: str = "unknown"
     projection_schema_version: str = "v1"
     projector_version: str = "slice2-v1"
+    # Package 1 (closes B2): "legacy" is the exempt default, matching
+    # BrainConfig.instance_id's own default — instance-marker enforcement is a
+    # no-op unless a caller explicitly declares "personal"/"work".
+    instance_id: str = "legacy"
 
 
 @dataclass

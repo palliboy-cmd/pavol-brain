@@ -11,6 +11,7 @@ from .models import WriteResponse
 from .write_policy import classify, enforce_band_c, validate_evidence_uris
 from .artifact_verifier import verify_all
 from . import artifact_validation as av
+from . import instance_identity
 from .control import PERSONAL_WORKSPACES,WORK_WORKSPACES
 
 RECORD_TYPES = {"problem", "analysis", "decision", "outcome"}
@@ -46,6 +47,7 @@ class JournalWriter:
             sql = con.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='memory_records'").fetchone()
             if not sql or "'problem'" not in sql[0] or "'analysis'" not in sql[0]:
                 raise BrainError("BRAIN_SCHEMA_MIGRATION_REQUIRED", "journal must be migrated to M1 schema v2", "")
+            instance_identity.enforce_journal(con, self.config.instance_id)
             return con
         except BrainError:
             raise

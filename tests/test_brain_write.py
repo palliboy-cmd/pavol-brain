@@ -27,10 +27,10 @@ class FakeEmbedder:
         seed=int(hashlib.sha256(text.encode()).hexdigest()[:8],16)
         return [float((seed>>(i*4))%11+1) for i in range(4)],"fake"
 
-def brain(tmp_path,identity="writer"):
-    journal=tmp_path/"journal.db";journal_fixture(journal)
+def brain(tmp_path,identity="writer",instance="personal"):
+    journal=tmp_path/"journal.db";journal_fixture(journal,instance_id=instance)
     config=BrainConfig(journal_db_path=journal,retrieval_db_path=tmp_path/"retrieval.db",embedding_dimension=4,
-                       endpoint_probe_timeout=.01,client_identity=identity,instance_id="personal")
+                       endpoint_probe_timeout=.01,client_identity=identity,instance_id=instance)
     return Brain(config,NoopTransport()),journal
 
 def attached_brain(journal,tmp_path,identity,instance="personal"):
@@ -77,7 +77,7 @@ def test_idempotency_is_agent_namespaced_and_semantic_duplicates_are_candidates(
 def test_instance_namespace_and_library_mapping_are_enforced(tmp_path):
     personal_dir=tmp_path/"personal-instance";work_dir=tmp_path/"work-instance";personal_dir.mkdir();work_dir.mkdir()
     personal,pjournal=brain(personal_dir,"same-agent")
-    _,wjournal=brain(work_dir,"seed");work=attached_brain(wjournal,work_dir,"same-agent","work")
+    _,wjournal=brain(work_dir,"seed",instance="work");work=attached_brain(wjournal,work_dir,"same-agent","work")
     p=personal.record_outcome(**outcome(summary="same semantic handoff",workspace="personal",idempotency_key="same-key"))
     w=work.record_outcome(**outcome(summary="same semantic handoff",workspace="sap-work",idempotency_key="same-key"))
     assert p.status==w.status=="accepted" and p.record_id!=w.record_id
@@ -177,7 +177,7 @@ def test_search_filters_corrupt_cross_workspace_related_record_ids(tmp_path):
     foreign=b.record_problem(statement="Foreign target",impact="test",source_assertion="explicit_user_confirmation",workspace="ai-pos")
     created="2026-07-13T00:00:00+00:00";con=sqlite3.connect(journal)
     con.execute("INSERT INTO artifact_links VALUES (?,?,?,?,?,?,?)",(personal.record_id,"record://"+foreign.record_id,"addresses",1.0,"corrupt-fixture",created,1));con.commit();con.close()
-    retrieval=tmp_path/"retrieval-scope.db";projector=ProjectionProjector(ProjectorConfig(journal,retrieval,"fake",4,"fake"),FakeEmbedder())
+    retrieval=tmp_path/"retrieval-scope.db";projector=ProjectionProjector(ProjectorConfig(journal,retrieval,"fake",4,"fake",instance_id="personal"),FakeEmbedder())
     while projector.run_once(100).status==ProjectionStatus.HEALTHY:pass
     scoped=Brain(BrainConfig(journal_db_path=journal,retrieval_db_path=retrieval,embedding_dimension=4,
                              endpoint_probe_timeout=.01,client_identity="reader",instance_id="personal"),NoopTransport())

@@ -30,4 +30,14 @@ CREATE TABLE IF NOT EXISTS graph_edges (
 CREATE TABLE IF NOT EXISTS projection_map (
  record_id TEXT NOT NULL, build_id TEXT NOT NULL, episode_uuid TEXT, PRIMARY KEY(record_id,build_id)
 );
+-- Package 1 (write-safety-integrity-repair-spec.md, closes B2): persisted
+-- per-journal instance identity. Stamped once by bootstrap (or the one-time
+-- backfill script) for personal/work journals; legacy/spike journals never
+-- get a row and stay exempt from instance-marker enforcement.
+CREATE TABLE IF NOT EXISTS brain_instance_identity (
+ singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+ instance_id TEXT NOT NULL CHECK(instance_id IN ('personal','work')),
+ created_at TEXT NOT NULL,
+ source_digest TEXT NOT NULL
+);
 PRAGMA user_version=2;

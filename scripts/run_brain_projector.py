@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -20,13 +21,15 @@ def main():
     p.add_argument("--journal-db", type=Path, required=True); p.add_argument("--retrieval-db", type=Path, required=True)
     p.add_argument("--batch-size", type=int, default=100); p.add_argument("--plan", action="store_true"); p.add_argument("--run-once", action="store_true"); p.add_argument("--validate", action="store_true"); p.add_argument("--output", type=Path)
     p.add_argument("--embedding-base-url", default="http://localhost:11434/v1"); p.add_argument("--embedding-model", default="nomic-embed-text:latest"); p.add_argument("--embedding-dimension", type=int, default=768)
+    p.add_argument("--instance-id", choices=("personal", "work", "legacy"), default=os.getenv("BRAIN_INSTANCE", "legacy"),
+                   help="Package 1: enforced against the journal's and retrieval DB's stamped instance marker; 'legacy' stays exempt")
     a = p.parse_args()
     if not (a.plan or a.run_once or a.validate): a.plan = True
     fp = hashlib.sha256(json.dumps({"profile": "local", "base_url": a.embedding_base_url.rstrip("/"), "model": a.embedding_model, "dimension": a.embedding_dimension, "document_prefix": "search_document: ", "query_prefix": "search_query: ", "normalization": "l2_normalized_float32"}, sort_keys=True).encode()).hexdigest()
-    config = ProjectorConfig(a.journal_db, a.retrieval_db, fp, a.embedding_dimension, a.embedding_model)
+    config = ProjectorConfig(a.journal_db, a.retrieval_db, fp, a.embedding_dimension, a.embedding_model, instance_id=a.instance_id)
     projector = ProjectionProjector(config, HttpDocumentEmbedder(a.embedding_base_url, a.embedding_model, a.embedding_dimension))
     journal_hash_before = sha256(a.journal_db)
-    output = {"journal_path": str(a.journal_db), "retrieval_path": str(a.retrieval_db), "journal_hash_before": journal_hash_before, "journal_schema_audit": JournalReader(a.journal_db).audit()}
+    output = {"journal_path": str(a.journal_db), "retrieval_path": str(a.retrieval_db), "journal_hash_before": journal_hash_before, "journal_schema_audit": JournalReader(a.journal_db, instance_id=a.instance_id).audit()}
     failed = False
     if a.plan: output["plan"] = projector.plan(a.batch_size).as_dict()
     if a.run_once:

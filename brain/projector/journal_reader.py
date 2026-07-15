@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from brain import artifact_validation as av
+from brain import instance_identity
 
 
 def sha256(path: Path) -> str:
@@ -13,8 +14,14 @@ def sha256(path: Path) -> str:
 
 
 class JournalReader:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, instance_id: str | None = None):
         self.path = Path(path)
+        # Package 1 (closes B2): None preserves the pre-existing behavior of
+        # standalone/diagnostic callers (e.g. run_brain_projector.py's
+        # --plan/audit path) that never claim an instance and must not be
+        # gated by one. ProjectionProjector always passes its configured
+        # instance_id, which enforce_journal itself no-ops for "legacy".
+        self.instance_id = instance_id
 
     @contextmanager
     def connect(self):
@@ -24,6 +31,8 @@ class JournalReader:
         con.row_factory = sqlite3.Row
         con.execute("PRAGMA query_only=ON")
         try:
+            if self.instance_id is not None:
+                instance_identity.enforce_journal(con, self.instance_id)
             yield con
         finally:
             con.close()

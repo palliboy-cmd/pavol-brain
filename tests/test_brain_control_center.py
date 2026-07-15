@@ -1,10 +1,17 @@
-import json,sys,threading,urllib.error,urllib.parse,urllib.request
+import json,sqlite3,sys,threading,urllib.error,urllib.parse,urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 import pytest
 sys.path.insert(0,str(Path(__file__).parents[1]))
 from brain.control import ControlStore,IntegrationProfile,READ_TOOLS,TOOLS
 from brain.control_center import App,generated_config,handler,metrics,read_activity,serve
+from brain import instance_identity
+
+ROOT=Path(__file__).parents[1]
+
+def stamped_journal(path,instance_id):
+ con=sqlite3.connect(path);con.executescript((ROOT/"spike/schema/journal.sql").read_text())
+ instance_identity.stamp_journal_marker(con,instance_id,"test-fixture-digest");con.commit();con.close()
 
 class FakeBrain:
  def health(self):
@@ -50,7 +57,8 @@ def test_generated_cli_configuration_quotes_paths_with_spaces(monkeypatch):
  cfg=generated_config(p)
  assert "'BRAIN_MCP_REMOTE_ROOT=/tmp/remote root'" in cfg and "'/tmp/client launcher'" in cfg
 
-def test_csrf_post_only_and_lifecycle(tmp_path):
+def test_csrf_post_only_and_lifecycle(tmp_path,monkeypatch):
+ monkeypatch.setenv("BRAIN_PERSONAL_JOURNAL_DB",str(tmp_path/"personal.db"));stamped_journal(tmp_path/"personal.db","personal")
  a=app(tmp_path);srv=ThreadingHTTPServer(("127.0.0.1",0),handler(a));threading.Thread(target=srv.serve_forever,daemon=True).start();base=f"http://127.0.0.1:{srv.server_port}"
  try:
   with pytest.raises(urllib.error.HTTPError) as e:urllib.request.urlopen(urllib.request.Request(base+"/integrations/add",data=b"integration_id=x",method="POST"));assert e.value.code==403
