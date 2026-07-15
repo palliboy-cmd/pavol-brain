@@ -11,5 +11,5 @@ for instance in personal work; do
   test -f "$journal"
   test ! -e "$retrieval" || { echo "$retrieval already exists; build requires a fresh target" >&2; exit 64; }
   "$python" "$root/scripts/run_brain_projector.py" --journal-db "$journal" --retrieval-db "$retrieval" \
-    --run-once --validate --batch-size 1000000 --output "$state/$instance/projector-build-manifest.json"
+    --instance-id "$instance" --run-once --validate --batch-size 1000000 --output "$state/$instance/projector-build-manifest.json"
 done

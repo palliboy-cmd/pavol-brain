@@ -10,6 +10,7 @@ import pytest
 
 from journal_fixture import journal_fixture
 from brain.errors import BrainError
+from brain import instance_identity
 
 ROOT=Path(__file__).parents[1]
 SPEC=importlib.util.spec_from_file_location("bootstrap_brain_instances",ROOT/"scripts/bootstrap_brain_instances.py")
@@ -453,3 +454,230 @@ def test_control_store_write_grant_gate_is_the_row_28_scenario(tmp_path,monkeypa
     lives in tests/test_brain_control.py::test_write_grant_requires_an_existing_marked_journal
     alongside the rest of ControlStore's own coverage."""
     assert True
+
+
+# --- Repair pass regressions (docs/reviews/package-1-bootstrap-instance-binding-review.md) ---
+
+def _seed_post_publish_write(journal):
+    con=sqlite3.connect(journal);con.execute("PRAGMA foreign_keys=OFF")
+    con.execute("INSERT INTO memory_records VALUES ('rec-post-publish',2,'problem','personal','normal','{}','{}','deadbeef','idem-post-publish','probe-agent','explicit_user_command',NULL,NULL,NULL,1.0,'2026-07-15T00:00:00+00:00','2026-07-15T00:00:00+00:00')")
+    con.execute("INSERT INTO memory_events VALUES ('evt-post-publish','rec-post-publish','record_created','2026-07-15T00:00:00+00:00','probe-agent','{}')")
+    con.execute("INSERT INTO record_state VALUES ('rec-post-publish','accepted','auto_accepted',NULL,NULL,NULL,NULL,'none',NULL,NULL,'evt-post-publish')")
+    con.commit();con.close()
+
+
+def test_B1_half_published_target_with_post_publish_write_is_never_clobbered_by_retry(tmp_path,monkeypatch):
+    """Blocking B-1 (Fable review Probe 1): a hard crash lands BETWEEN the two
+    os.replace calls in publish_pair — only "personal" is published, "work" is
+    not — a legitimate write then commits into the published personal
+    journal, and the operator retries. The retry must refuse (never exit 0)
+    and must never overwrite the committed write; the state is
+    recoverable_partial with a surviving (digest-diverged) target, which
+    cleanup correctly does not delete, and main() must not fall through to a
+    fresh build/publish over it."""
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    original_replace=bootstrap.os.replace;calls=0
+    def crash_between_replaces(src,dst):
+        nonlocal calls
+        if Path(dst) in (personal,work):
+            calls+=1
+            if calls==2:raise KeyboardInterrupt("hard crash between the two publishes")
+        return original_replace(src,dst)
+    monkeypatch.setattr(bootstrap.os,"replace",crash_between_replaces)
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(BaseException):bootstrap.main()
+    monkeypatch.undo()
+    assert personal.exists() and not work.exists() and not manifest.exists()
+    marker=manifest.with_name(manifest.name+".publish-pending");assert marker.exists()
+    assert bootstrap.classify_recovery(marker,manifest,personal,work)[0]=="recoverable_partial"
+
+    _seed_post_publish_write(personal)
+
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(SystemExit) as error:bootstrap.main()
+    assert error.value.code!=0  # must never silently succeed (was exit 0 before the fix)
+    assert error.value.code==4
+    survived=sqlite3.connect(personal).execute("SELECT record_id FROM memory_records WHERE record_id='rec-post-publish'").fetchone()
+    assert survived is not None, "B-1 regression: the retry must never destroy a committed post-publish write"
+    assert not work.exists() and not manifest.exists()
+
+
+def test_B1_target_appearing_between_build_and_publish_is_refused_toctou(tmp_path,monkeypatch):
+    """Blocking B-1 TOCTOU guard: a target materializes (concurrent process,
+    restored backup, operator mistake) in the window between staging/build
+    completing and publish_pair actually running. Must refuse, must not
+    overwrite the surviving file, must not publish either target."""
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    original_build=bootstrap.build;calls=0
+    def sneaky_build(*args,**kwargs):
+        nonlocal calls;calls+=1
+        result=original_build(*args,**kwargs)
+        if calls==2:  # "work" build just finished; a target appears out of nowhere
+            personal.write_text("a target that appeared out of nowhere")
+        return result
+    monkeypatch.setattr(bootstrap,"build",sneaky_build)
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(RuntimeError,match="appeared before publish"):bootstrap.main()
+    assert personal.read_text()=="a target that appeared out of nowhere"
+    assert not work.exists() and not manifest.exists()
+    assert not manifest.with_name(manifest.name+".publish-pending").exists()
+
+
+def test_H1_dry_run_never_overwrites_a_published_manifest(tmp_path,monkeypatch):
+    """High H-1 (Fable review Probe 2): a plain dry run over an already
+    completed bootstrap must leave the published manifest byte-identical and
+    route its own report to a sibling preflight file; the next --apply rerun
+    must still be the idempotent already_bootstrapped no-op."""
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    _run_apply(monkeypatch,source,personal,work,manifest,exclusion)
+    before=manifest.read_bytes()
+    assert json.loads(before).get("published") is True
+
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion,apply=False))
+    bootstrap.main()
+    assert manifest.read_bytes()==before, "H-1 regression: dry run must never overwrite a published manifest"
+    preflight=manifest.with_name(manifest.name+".preflight.json")
+    assert preflight.exists()
+    assert json.loads(preflight.read_text()).get("manifest_preserved") is True
+
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main()  # must return normally (idempotent already_bootstrapped), not raise
+    assert manifest.read_bytes()==before
+
+
+def test_M1_forward_completion_records_recovered_observation(tmp_path,monkeypatch):
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    original=bootstrap.write_json_atomic
+    def fail_on_manifest(path,data):
+        if Path(path)==manifest:raise RuntimeError("simulated crash right before manifest write")
+        return original(path,data)
+    monkeypatch.setattr(bootstrap,"write_json_atomic",fail_on_manifest)
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(RuntimeError,match="simulated crash"):bootstrap.main()
+    monkeypatch.undo()
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main()
+    report=json.loads(manifest.read_text())
+    observation=report["recovered_observation"]
+    for role in ("personal","work"):
+        assert observation[role]["exists"] is True
+        assert observation[role]["integrity_check"]=="ok"
+        assert observation[role]["foreign_key_violations"]==[]
+        assert observation[role]["marker"]["instance_id"]==role
+        assert observation[role]["logical_digest"]==report["result_journal_digests"][role]
+
+
+def test_M1_forward_completion_refuses_when_foreign_key_check_fails(tmp_path,monkeypatch):
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    original=bootstrap.write_json_atomic
+    def fail_on_manifest(path,data):
+        if Path(path)==manifest:raise RuntimeError("simulated crash right before manifest write")
+        return original(path,data)
+    monkeypatch.setattr(bootstrap,"write_json_atomic",fail_on_manifest)
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(RuntimeError,match="simulated crash"):bootstrap.main()
+    monkeypatch.undo()
+    assert personal.exists() and work.exists() and not manifest.exists()
+
+    # Corrupt the published personal journal so it fails PRAGMA foreign_key_check.
+    con=sqlite3.connect(personal);con.execute("PRAGMA foreign_keys=OFF")
+    con.execute("INSERT INTO memory_events VALUES ('evt-dangling','rec-does-not-exist','record_created','2026-07-15T00:00:00+00:00','agent','{}')")
+    con.commit();con.close()
+    assert sqlite3.connect(personal).execute("PRAGMA foreign_key_check").fetchall()
+
+    marker=manifest.with_name(manifest.name+".publish-pending")
+    classification,detail=bootstrap.classify_recovery(marker,manifest,personal,work)
+    assert classification=="corrupted"
+    assert any(issue["target"]=="personal" and issue["issue"]=="foreign_key_violations" for issue in detail["issues"])
+
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(SystemExit) as error:bootstrap.main()
+    assert error.value.code==4
+    assert not manifest.exists()  # forward-completion must not have run
+
+
+def test_M1_forward_completion_refuses_when_workspace_partition_is_violated(tmp_path,monkeypatch):
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    original=bootstrap.write_json_atomic
+    def fail_on_manifest(path,data):
+        if Path(path)==manifest:raise RuntimeError("simulated crash right before manifest write")
+        return original(path,data)
+    monkeypatch.setattr(bootstrap,"write_json_atomic",fail_on_manifest)
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(RuntimeError,match="simulated crash"):bootstrap.main()
+    monkeypatch.undo()
+    assert personal.exists() and work.exists() and not manifest.exists()
+
+    # A record with a foreign (sap-work) workspace lands in the published
+    # personal journal — a partition violation forward-completion must catch.
+    con=sqlite3.connect(personal);con.execute("PRAGMA foreign_keys=OFF")
+    con.execute("INSERT INTO memory_records VALUES ('rec-foreign-ws',2,'problem','sap-work','sensitive','{}','{}','h','k','agent','explicit_user_command',NULL,NULL,NULL,1.0,'2026-07-15T00:00:00+00:00','2026-07-15T00:00:00+00:00')")
+    con.execute("INSERT INTO memory_events VALUES ('evt-foreign-ws','rec-foreign-ws','record_created','2026-07-15T00:00:00+00:00','agent','{}')")
+    con.execute("INSERT INTO record_state VALUES ('rec-foreign-ws','accepted','auto_accepted',NULL,NULL,NULL,NULL,'none',NULL,NULL,'evt-foreign-ws')")
+    con.commit();con.close()
+
+    marker=manifest.with_name(manifest.name+".publish-pending")
+    classification,detail=bootstrap.classify_recovery(marker,manifest,personal,work)
+    assert classification=="corrupted"
+    assert any(issue["target"]=="personal" and issue["issue"]=="workspace_partition_violation" and "sap-work" in issue["detail"] for issue in detail["issues"])
+
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(SystemExit) as error:bootstrap.main()
+    assert error.value.code==4
+    assert not manifest.exists()
+
+
+def test_H2_build_brain_m1_indexes_script_passes_instance_id_to_projector():
+    """High H-2: the documented index-build script must pass --instance-id to
+    run_brain_projector.py, or the resulting index is silently built under
+    the legacy exemption and later refused by every marked reader."""
+    text=(ROOT/"scripts/build_brain_m1_indexes.sh").read_text()
+    assert '--instance-id "$instance"' in text
+    # the flag must be part of the same invocation, not merely present somewhere else in the file
+    lines=text.splitlines()
+    call_index=next(i for i,line in enumerate(lines) if "run_brain_projector.py" in line)
+    call_block="\n".join(lines[call_index:call_index+3])
+    assert '--instance-id "$instance"' in call_block
+
+
+def test_H2_run_brain_projector_instance_id_flag_enforces_marker_via_plan(tmp_path):
+    """The --plan path is read-only (never calls the embedding endpoint), so
+    this exercises the real CLI -> ProjectorConfig(instance_id=...) wiring
+    end-to-end without needing a live embedding server."""
+    matching=tmp_path/"personal.db";journal_fixture(matching,instance_id="personal")
+    ok=subprocess.run([sys.executable,str(ROOT/"scripts/run_brain_projector.py"),"--journal-db",str(matching),
+                       "--retrieval-db",str(tmp_path/"r1.db"),"--instance-id","personal","--plan"],
+                      capture_output=True,text=True)
+    assert ok.returncode==0,ok.stderr
+    assert json.loads(ok.stdout)["plan"]["status"] in ("HEALTHY","NO_CHANGES")
+
+    mismatched=tmp_path/"work.db";journal_fixture(mismatched,instance_id="work")
+    refused=subprocess.run([sys.executable,str(ROOT/"scripts/run_brain_projector.py"),"--journal-db",str(mismatched),
+                            "--retrieval-db",str(tmp_path/"r2.db"),"--instance-id","personal","--plan"],
+                           capture_output=True,text=True)
+    assert refused.returncode!=0
+    assert "BRAIN_INSTANCE_MISMATCH" in refused.stderr
+
+
+def test_M3_smoke_brain_m1_write_end_to_end_against_disposable_paths(tmp_path):
+    """Medium M-3: the documented write-smoke step must complete end to end
+    against fresh disposable paths, and must never leak its temporary
+    BRAIN_*_JOURNAL_DB env override into the parent process."""
+    journal=tmp_path/"smoke-journal.db";control=tmp_path/"smoke-control.db"
+    env={k:v for k,v in os.environ.items() if not k.startswith("BRAIN_")}
+    before_env=dict(os.environ)
+    result=subprocess.run([sys.executable,str(ROOT/"scripts/smoke_brain_m1_write.py"),
+                           "--journal-db",str(journal),"--control-db",str(control),
+                           "--instance","personal","--workspace","personal"],
+                          capture_output=True,text=True,env=env,cwd=ROOT)
+    assert result.returncode==0,result.stderr
+    report=json.loads(result.stdout)
+    assert report["result"]["status"]=="accepted" and report["disposable"] is True
+    assert dict(os.environ)==before_env  # subprocess env changes never touch the parent
+    assert instance_identity.read_journal_marker(sqlite3.connect(journal))["instance_id"]=="personal"

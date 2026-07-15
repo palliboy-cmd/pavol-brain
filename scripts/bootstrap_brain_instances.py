@@ -301,14 +301,16 @@ def write_json_atomic(path,data):
 def inspect_target(path):
     """Best-effort, read-only inspection of a file that may or may not be a
     valid journal. Never raises. ``sha256`` is always populated when the file
-    exists; ``logical_digest`` and ``marker`` are populated only when the file
-    is a readable, structurally intact journal — comparisons against them
-    therefore fail safe (a corrupted or foreign file never accidentally
-    matches a recorded digest or identity)."""
+    exists; ``logical_digest``, ``marker``, ``foreign_key_violations``, and
+    ``workspaces`` are populated only when the file is a readable,
+    structurally intact journal — comparisons against them therefore fail
+    safe (a corrupted or foreign file never accidentally matches a recorded
+    digest or identity, and is never treated as FK/partition-clean)."""
     path = Path(path)
     if not path.is_file():
         return None
-    info = {"sha256": sha(path), "logical_digest": None, "integrity_check": None, "marker": None}
+    info = {"sha256": sha(path), "logical_digest": None, "integrity_check": None, "marker": None,
+            "foreign_key_violations": None, "workspaces": None}
     try:
         con = readonly(path)
     except sqlite3.Error:
@@ -318,6 +320,8 @@ def inspect_target(path):
         if info["integrity_check"] == "ok":
             info["logical_digest"] = logical_digest(con, TABLES)
             info["marker"] = instance_identity.read_journal_marker(con)
+            info["foreign_key_violations"] = [tuple(row) for row in con.execute("PRAGMA foreign_key_check")]
+            info["workspaces"] = sorted({row[0] for row in con.execute("SELECT DISTINCT workspace FROM memory_records")})
     except sqlite3.Error:
         pass
     finally:
@@ -354,6 +358,21 @@ def _identity_matches(info, role, source_digest):
     manifest describing that fact."""
     marker = info.get("marker") if info else None
     return bool(marker) and marker.get("instance_id") == role and marker.get("source_digest") == source_digest and source_digest is not None
+
+
+def _forward_completion_issues(personal_info, work_info):
+    """FK and workspace-partition re-check gating forward-completion (M-1).
+    Both targets already passed this at build() time; this re-proves it still
+    holds for whatever is on disk now, without re-verifying content digest
+    (which a legitimate post-publish write is expected to change)."""
+    issues = []
+    for role, info, expected in (("personal", personal_info, PERSONAL_WORKSPACES), ("work", work_info, WORK_WORKSPACES)):
+        if info["foreign_key_violations"]:
+            issues.append({"target": role, "issue": "foreign_key_violations", "detail": info["foreign_key_violations"]})
+        if info["workspaces"] is not None and not set(info["workspaces"]) <= set(expected):
+            issues.append({"target": role, "issue": "workspace_partition_violation",
+                            "detail": sorted(set(info["workspaces"]) - set(expected))})
+    return issues
 
 
 def classify_recovery(marker_path, manifest_path, personal_path, work_path):
@@ -406,6 +425,14 @@ def classify_recovery(marker_path, manifest_path, personal_path, work_path):
         # published and may already have legitimate writes in it. Only the
         # manifest write is missing — complete it, never re-derive or verify
         # the pair's *current* content against the pre-publish staged digest.
+        # But a legitimate write can only ever add FK-clean rows in the
+        # target's own workspace partition (the writer enforces both) — if
+        # either target now fails FK or partition validation, something else
+        # is wrong with it, and forward-completion must not paper over that.
+        validation_issues = _forward_completion_issues(personal_info, work_info)
+        if validation_issues:
+            return "corrupted", {"reason": "forward-completion pre-check failed", "issues": validation_issues,
+                                  "personal": personal_info, "work": work_info}
         return "crash_after_publish_before_manifest", {}
     unexpected = []
     if personal_info is not None and not personal_is_ours: unexpected.append("personal")
@@ -427,10 +454,28 @@ def cleanup_recoverable_partial(marker_data, personal_path, work_path):
         Path(str(path) + ".staging").unlink(missing_ok=True)
 
 
-def forward_complete_from_marker(marker_data, manifest_path):
+def _observation(info):
+    """The subset of inspect_target()'s output worth recording as evidence
+    that this target was actually inspected at recovery time, not merely
+    trusted from the (necessarily stale) marker file."""
+    if info is None:
+        return {"exists": False}
+    return {"exists": True, "sha256": info["sha256"], "logical_digest": info["logical_digest"],
+            "integrity_check": info["integrity_check"], "foreign_key_violations": info["foreign_key_violations"],
+            "marker": info["marker"], "workspaces": info["workspaces"]}
+
+
+def forward_complete_from_marker(marker_data, manifest_path, personal_path, work_path):
     """Row 6: publish_pair already succeeded but the manifest write never
-    happened. Write the manifest from what the marker recorded and stop —
-    never touch the (already correctly published) target files."""
+    happened. Write the manifest from what the marker recorded — the staged
+    digests remain the load-bearing result_journal_digests, since content is
+    expected to have moved on and later `live` detection depends on them
+    describing what was *published*, not what is on disk right now — plus a
+    recovered_observation of each target's actual current state, so this
+    manifest is not silently weaker evidence than a normal one. Never
+    touches the (already correctly published) target files. Callers must
+    have already gated FK/partition validity via classify_recovery's
+    forward-completion check before calling this."""
     personal = marker_data.get("personal") or {}
     work = marker_data.get("work") or {}
     report = {
@@ -440,6 +485,8 @@ def forward_complete_from_marker(marker_data, manifest_path):
         "personal": dict(personal),
         "work": dict(work),
         "result_journal_digests": {"personal": personal.get("logical_digest"), "work": work.get("logical_digest")},
+        "recovered_observation": {"personal": _observation(inspect_target(personal_path)),
+                                   "work": _observation(inspect_target(work_path))},
         "published": True,
     }
     write_json_atomic(manifest_path, report)
@@ -472,7 +519,7 @@ def main():
                 print(a.manifest.read_text(), end=""); return
             if recovery_classification == "crash_after_publish_before_manifest":
                 marker_data = json.loads(marker.read_text())
-                forward_complete_from_marker(marker_data, a.manifest)
+                forward_complete_from_marker(marker_data, a.manifest, a.personal_journal, a.work_journal)
                 marker.unlink(missing_ok=True)
                 print(a.manifest.read_text(), end=""); return
             if recovery_classification in BLOCKING_CLASSIFICATIONS:
@@ -484,6 +531,18 @@ def main():
                 marker_data = json.loads(marker.read_text()) if marker.exists() else {}
                 cleanup_recoverable_partial(marker_data, a.personal_journal, a.work_journal)
                 marker.unlink(missing_ok=True)
+                # B-1: cleanup only ever deletes a digest-verified own output;
+                # a target that survived it (a legitimate write changed its
+                # content, or it is genuinely foreign) must never be silently
+                # folded into a fresh build/publish below.
+                surviving = [name for name, path in (("personal", a.personal_journal), ("work", a.work_journal)) if Path(path).exists()]
+                if surviving:
+                    surviving_report = {"recovery_classification": "recoverable_partial_cleanup_incomplete",
+                                         "detail": {"surviving_targets": surviving,
+                                                    "reason": "target(s) remained after digest-verified cleanup; refusing rather than overwriting"},
+                                         "personal_journal": str(a.personal_journal), "work_journal": str(a.work_journal)}
+                    print(json.dumps(surviving_report, ensure_ascii=False, indent=2))
+                    raise SystemExit(4)
             # "fresh": nothing to clean up; fall through to a normal build.
 
     source_sha_before = sha(a.source)
@@ -582,6 +641,14 @@ def main():
                     raise RuntimeError("legacy source changed during bootstrap")
                 report["source_sha256_after"] = source_sha_after
                 report["result_journal_digests"] = {"personal": report["personal"]["logical_digest"], "work": report["work"]["logical_digest"]}
+                # B-1 TOCTOU guard: staging both journals can take a while;
+                # re-verify absence immediately before claiming (marker) or
+                # performing (publish_pair) a publish. A target appearing in
+                # this window (a concurrent bootstrap, a restored backup, an
+                # operator mistake) is refused, never silently overwritten.
+                surviving = [name for name, path in (("personal", a.personal_journal), ("work", a.work_journal)) if Path(path).exists()]
+                if surviving:
+                    raise RuntimeError(f"target(s) appeared before publish, refusing to overwrite: {surviving}")
                 write_json_atomic(marker,{
                     "source_digest":snapshot_digest,"started_at":now_iso(),
                     "personal":{"path":str(a.personal_journal.resolve()),"sha256":report["personal"]["sha256"],"logical_digest":report["personal"]["logical_digest"]},
@@ -596,7 +663,22 @@ def main():
                 staged_personal.unlink(missing_ok=True); staged_work.unlink(missing_ok=True)
         if a.manifest and not report.get("published"):
             a.manifest.parent.mkdir(parents=True, exist_ok=True)
-            write_json_atomic(a.manifest,report)
+            # H-1: a manifest already recording a real publish is the state
+            # machine's own input (classify_recovery reads it back). A run
+            # that is not itself completing a publish — chiefly a plain
+            # preflight dry run — must never overwrite it; the preflight
+            # report goes to a sibling file instead. (--apply reaching this
+            # line with an already-published on-disk manifest cannot happen:
+            # classify_recovery would have already returned/raised via
+            # already_bootstrapped/live/completed_crash_after_manifest above.)
+            existing_published = a.manifest.exists() and json.loads(a.manifest.read_text()).get("published") is True
+            if existing_published:
+                preflight_path = a.manifest.with_name(a.manifest.name + ".preflight.json")
+                report["manifest_preserved"] = True
+                report["preflight_report_path"] = str(preflight_path)
+                write_json_atomic(preflight_path, report)
+            else:
+                write_json_atomic(a.manifest,report)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         if blocked:
             raise SystemExit(2)
