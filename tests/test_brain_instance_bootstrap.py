@@ -501,6 +501,18 @@ def test_B1_half_published_target_with_post_publish_write_is_never_clobbered_by_
     survived=sqlite3.connect(personal).execute("SELECT record_id FROM memory_records WHERE record_id='rec-post-publish'").fetchone()
     assert survived is not None, "B-1 regression: the retry must never destroy a committed post-publish write"
     assert not work.exists() and not manifest.exists()
+    assert marker.exists(), "the publish-pending marker must be preserved in the recoverable_partial_cleanup_incomplete refusal state, not deleted"
+
+    # The marker being preserved means the next retry re-derives the same
+    # precise classification (recoverable_partial), not a degraded generic
+    # incompatible_existing_state — and stays exactly as fail-closed.
+    personal_bytes_before=personal.read_bytes()
+    assert bootstrap.classify_recovery(marker,manifest,personal,work)[0]=="recoverable_partial"
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(SystemExit) as error:bootstrap.main()
+    assert error.value.code==4
+    assert marker.exists()
+    assert personal.read_bytes()==personal_bytes_before and not work.exists() and not manifest.exists()
 
 
 def test_B1_target_appearing_between_build_and_publish_is_refused_toctou(tmp_path,monkeypatch):

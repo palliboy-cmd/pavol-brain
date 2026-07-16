@@ -207,3 +207,38 @@ M-2 (marker forgeability under local-FS trust — documentation-only recommendat
 ### Re-review scope
 
 Per this review's closing sentence, re-review can be limited to the five changed paths above (`scripts/bootstrap_brain_instances.py`'s `main()`/`classify_recovery`/`forward_complete_from_marker`, `scripts/build_brain_m1_indexes.sh`, `scripts/smoke_brain_m1_write.py`) plus their new tests; nothing else in the Package 1 diff was touched by this repair pass.
+
+---
+
+## 11. Delta re-review (Claude Fable 5, 2026-07-15)
+
+- **Reviewed delta:** `2ec71d8..59f97c4` ("fix(brain): close Package 1 recovery and rollout gaps") — only the delta; unchanged Package 1 code was not re-reviewed.
+- **Method:** full delta diff read; full suite plus every repair regression test re-executed by the reviewer; original Probes 1 and 2 re-run **byte-identical**; two additional delta probes executed (marker fate + second-retry behavior in the B-1 refusal state; forward-completion with a real post-publish write).
+- The original review body (§1–§9) and its `REVISE PACKAGE 1` verdict are historical record and remain untouched.
+
+### Finding status
+
+| Finding | Status | Executed evidence |
+|---|---|---|
+| B-1 half-published committed-journal clobber | **CLOSED** | Probe 1 byte-identical: retry now exits **4** (was 0), post-publish write **survives**; `test_B1_half_published_target_with_post_publish_write_is_never_clobbered_by_retry` passes. Second-retry probe: subsequent runs classify `incompatible_existing_state`, exit 3, journal byte-identical — no path reaches a build/publish over the survivor. |
+| B-1 pre-publish TOCTOU overwrite | **CLOSED** | Guard sits immediately before the marker write + `publish_pair` (the only `publish_pair` call site); `test_B1_target_appearing_between_build_and_publish_is_refused_toctou` passes — the appeared file is preserved, nothing published. The residual microsecond race between the final `exists()` check and `os.replace` is inherent to the syscall pair and acceptable. |
+| H-1 dry-run published-manifest corruption | **CLOSED** | Probe 2 byte-identical: manifest `published`/`result_journal_digests` survive the dry run, classification stays `already_bootstrapped`, `--apply` rerun idempotent; `test_H1_dry_run_never_overwrites_a_published_manifest` asserts byte-identity. The sibling `<manifest>.preflight.json` cannot affect classification: `classify_recovery` reads exactly `marker_path` and `manifest_path`, and Probe 2 shows classification unchanged with the sibling present. |
+| H-2 missing instance propagation in `build_brain_m1_indexes.sh` | **CLOSED** | One-line `--instance-id "$instance"` verified in diff; `test_H2_build_brain_m1_indexes_script_passes_instance_id_to_projector` (textual, invocation-scoped) and `test_H2_run_brain_projector_instance_id_flag_enforces_marker_via_plan` (real CLI via subprocess; matching journal accepted, mismatched refused with `BRAIN_INSTANCE_MISMATCH`) both pass. |
+| M-3 broken `smoke_brain_m1_write.py` flow | **CLOSED** | `test_M3_smoke_brain_m1_write_end_to_end_against_disposable_paths` passes: end-to-end exit 0 against fresh disposable paths, disposable journal stamped, env redirect restored in `finally`, no parent-process env leakage, no real journal touched. |
+| M-1 forward-completion FK/partition validation + recovered observation | **CLOSED** | `classify_recovery` now downgrades to `corrupted` (exit 4, nothing deleted, manifest never written) on FK or partition failure — both refusal tests pass. Delta probe with a real post-publish write: `recovered_observation` records the **actual** current state (`logical_digest` diverged from the staged `result_journal_digests`, FK-clean, marker recorded), and a further rerun over the now-diverged pair classifies `live` and refuses (exit 3) — the staged digests' state-machine semantics are intact. |
+
+### Deviation found (does not reopen any finding)
+
+**The publish-pending marker is *not* preserved in the B-1 refusal state.** `main()` unlinks the marker *before* the surviving-target check, so the exit-4 refusal leaves no marker behind — the repair brief asked for the marker to be kept there, and the committed regression test does not assert its presence. Executed consequences (delta probe): the surviving journal stays byte-identical with the committed write intact; the *next* retry classifies `incompatible_existing_state` and exits 3 — still fail-closed, nothing deleted or overwritten, but the operator loses the marker's staged digests as forensic context and the precise `recoverable_partial_cleanup_incomplete` classification degrades to a generic refusal on subsequent runs. The runbook is honest about this (it documents the marker as deleted during cleanup), so no doc overclaims. Graded **Low** (evidence/ergonomics, zero integrity impact — every mutating path remains provably closed). Recommended one-line follow-up for any later package: move `marker.unlink` after the surviving-target check and extend the B-1 regression test to assert marker presence in the refusal state.
+
+**Resolved (2026-07-15, same-day follow-up, Claude Sonnet 5):** `marker.unlink(missing_ok=True)` in the `recoverable_partial` branch of `main()` now runs only *after* the surviving-target check finds no survivors, so the marker is preserved through the entire `recoverable_partial_cleanup_incomplete` exit-4 refusal. `test_B1_half_published_target_with_post_publish_write_is_never_clobbered_by_retry` was extended to assert `marker.exists()` after the refusal, and to run a second retry confirming the classification stays the precise `recoverable_partial` (not the generic `incompatible_existing_state` observed above) with the journal still byte-identical and the marker still present. Full suite re-run: 160 passed + 5 subtests, 0 failed. This Low finding is now closed; see `docs/operations/brain-runtime.md`'s state-machine table for the updated `recoverable_partial` row.
+
+### Hygiene
+
+Full suite: **160 passed + 5 subtests, 0 failed** (re-run by this reviewer). Delta touches only `scripts/` + tests + docs — zero changes under `brain/`; MCP tool surface unchanged (all `test_brain_mcp.py` pass, `check_exported()` true); no secrets, no user-absolute paths, no `.db`/runtime data, no feature creep in the delta.
+
+### Delta verdict
+
+**`APPROVED FOR PACKAGE 2`**
+
+All six reviewed findings are closed with executed evidence; the single deviation found is fail-closed, non-destructive, honestly documented, and does not reopen B-1. Package 2 may proceed on `59f97c4`; the marker-preservation follow-up and the previously deferred M-2/L-1–L-3 items remain on the backlog.

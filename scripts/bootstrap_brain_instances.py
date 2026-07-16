@@ -530,11 +530,14 @@ def main():
             if recovery_classification == "recoverable_partial":
                 marker_data = json.loads(marker.read_text()) if marker.exists() else {}
                 cleanup_recoverable_partial(marker_data, a.personal_journal, a.work_journal)
-                marker.unlink(missing_ok=True)
                 # B-1: cleanup only ever deletes a digest-verified own output;
                 # a target that survived it (a legitimate write changed its
                 # content, or it is genuinely foreign) must never be silently
-                # folded into a fresh build/publish below.
+                # folded into a fresh build/publish below. The marker is kept
+                # in that refusal state — it is the forensic record of what
+                # this bootstrap staged and is still needed to classify the
+                # next retry precisely; it is only removed once we know we
+                # are actually proceeding to a fresh run.
                 surviving = [name for name, path in (("personal", a.personal_journal), ("work", a.work_journal)) if Path(path).exists()]
                 if surviving:
                     surviving_report = {"recovery_classification": "recoverable_partial_cleanup_incomplete",
@@ -543,6 +546,7 @@ def main():
                                          "personal_journal": str(a.personal_journal), "work_journal": str(a.work_journal)}
                     print(json.dumps(surviving_report, ensure_ascii=False, indent=2))
                     raise SystemExit(4)
+                marker.unlink(missing_ok=True)
             # "fresh": nothing to clean up; fall through to a normal build.
 
     source_sha_before = sha(a.source)
