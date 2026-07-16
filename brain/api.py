@@ -10,6 +10,7 @@ from .audit import AuditLogger
 from .runtime import RuntimeInspector
 from .writer import JournalWriter
 from .write_policy import validate_request_id, looks_like_secret
+from .record_uri import classify_record_uri, record_target_id, CANONICAL_RECORD_TARGET, MALFORMED_RECORD_LIKE
 
 class _UnrestrictedOperatorScope:
     """Trusted full-access sentinel for local operator/diagnostic tooling only.
@@ -125,21 +126,33 @@ class Brain:
         if not self._workspace_allowed(linked["workspace"],allowed_workspaces): return False
         if not self._sensitivity_allowed(linked["workspace"],linked["sensitivity"],allowed_workspaces,sensitive_allowed,sensitive_workspaces): return False
         return True
-    def _relation_target_id(self,row):
-        # Uniform target extraction for every relation-row shape Repository.related()
-        # produces (Package 5 / B4): supersede rows carry neither a "direction" nor a
-        # record:// artifact_uri, so they must be matched by relation name explicitly --
-        # this is the only place relation *name* drives extraction; the authorization
-        # check that follows (_target_visible) is identical for every shape.
-        if row.get("relation") in ("supersedes","superseded_by"): return row.get("record_id")
-        if row.get("direction")=="incoming": return row.get("record_id")
-        if str(row.get("artifact_uri") or "").startswith("record://"): return row.get("record_id")
-        return None
+    def _classify_relation_row(self,row):
+        # Uniform classification for every relation-row shape Repository.related()
+        # produces (Package 5 / B4, F1 repair): a genuine record_state supersede/
+        # superseded_by row never carries an "artifact_uri" key (Repository.related()
+        # builds those from record_state directly), so it's matched by relation name
+        # alone -- a corrupt artifact_links row that merely reuses the relation name
+        # "supersedes" still has an artifact_uri and falls through to URI
+        # classification like any other outgoing row. Incoming rows are tagged by
+        # repository code, never by DB-controlled content. Everything else -- the
+        # only DB-controlled-content path -- is classified by artifact_uri via the
+        # shared fail-closed classifier: canonical record:// resolves, anything
+        # record-scheme-shaped but non-canonical is dropped outright (never
+        # tolerantly resolved, never treated as an ordinary artifact URI), and true
+        # non-record URIs are untouched.
+        if "artifact_uri" not in row and row.get("relation") in ("supersedes","superseded_by"):
+            return CANONICAL_RECORD_TARGET,row.get("record_id")
+        if row.get("direction")=="incoming": return CANONICAL_RECORD_TARGET,row.get("record_id")
+        uri=row.get("artifact_uri")
+        classification=classify_record_uri(uri)
+        if classification==CANONICAL_RECORD_TARGET: return classification,record_target_id(uri)
+        return classification,None
     def _scope_related(self,rows,allowed_workspaces,sensitive_allowed=False,sensitive_workspaces=()):
         filtered=[]
         for row in rows:
-            target=self._relation_target_id(row)
-            if target is not None and not self._target_visible(target,allowed_workspaces,sensitive_allowed,sensitive_workspaces):continue
+            classification,target=self._classify_relation_row(row)
+            if classification==MALFORMED_RECORD_LIKE: continue
+            if classification==CANONICAL_RECORD_TARGET and not self._target_visible(target,allowed_workspaces,sensitive_allowed,sensitive_workspaces):continue
             filtered.append(row)
         return filtered
     def _meta(self):

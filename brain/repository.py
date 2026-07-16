@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from .errors import BrainError
 from . import instance_identity
+from .record_uri import classify_record_uri, record_target_id, CANONICAL_RECORD_TARGET
 
 class Repository:
     def __init__(self,config): self.config=config
@@ -53,7 +54,7 @@ class Repository:
             out=[]
             for r in con.execute("SELECT relation,artifact_uri,record_id FROM artifact_links WHERE record_id=? AND active=1",(record_id,)):
                 item=dict(r)
-                if item["artifact_uri"].startswith("record://"):item["record_id"]=item["artifact_uri"][9:]
+                if classify_record_uri(item["artifact_uri"])==CANONICAL_RECORD_TARGET:item["record_id"]=record_target_id(item["artifact_uri"])
                 out.append(item)
             target="record://"+record_id
             for r in con.execute("SELECT relation,artifact_uri,record_id FROM artifact_links WHERE artifact_uri=? AND active=1",(target,)):

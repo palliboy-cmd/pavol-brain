@@ -13,6 +13,7 @@ the governing invariant (I10, spec S5.2): every id returned via expansion
 must be independently fetchable by the same caller through a direct,
 scoped get_record call.
 """
+import ast
 import hashlib
 import json
 import sqlite3
@@ -30,6 +31,7 @@ from brain.config import BrainConfig
 from brain.errors import BrainError
 from brain.projector import ProjectorConfig, ProjectionProjector
 from brain.projector.models import ProjectionStatus
+from brain.record_uri import classify_record_uri, record_target_id, CANONICAL_RECORD_TARGET
 
 from test_brain_write import brain, problem, NoopTransport, FakeEmbedder
 
@@ -257,6 +259,93 @@ def test_foreign_workspace_direct_fetch_is_not_found_not_denied(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# F1 (package-5-scope-safe-retrieval-review.md): a corrupt artifact_links row
+# whose URI merely *looks* like a record scheme -- wrong case, extra/missing
+# slashes, surrounding whitespace, query/fragment, or percent-encoded -- must
+# never resolve as a record relation and must never fall through to be
+# treated as an ordinary artifact URI either, since its raw text still names
+# a foreign record. The row is dropped outright: no URI, no id, anywhere in
+# the response.
+# ---------------------------------------------------------------------------
+
+MALFORMED_RECORD_URI_TEMPLATES = [
+    "Record://{id}",       # case-variant scheme
+    "RECORD://{id}",       # case-variant scheme
+    "record:/{id}",        # single slash
+    "record:////{id}",     # extra slashes
+    " record://{id}",      # leading whitespace
+    "record://{id} ",      # trailing whitespace
+    "record://",           # empty id
+    "record://{id}?x=1",   # query suffix
+    "record://{id}#fragment",  # fragment suffix
+    "record%3A%2F%2F{id}",  # percent-encoded scheme+slashes
+]
+
+
+@pytest.mark.parametrize("uri_template", MALFORMED_RECORD_URI_TEMPLATES)
+def test_f1_malformed_record_like_uri_dropped_from_get_related_and_search(tmp_path, uri_template):
+    b, journal, personal, foreign, sensitive = seeded(tmp_path)
+    uri = uri_template.format(id=foreign.record_id)
+    corrupt_link(journal, personal.record_id, uri)
+    journal_before = journal.read_bytes()
+
+    related = b.get_related(personal.record_id, allowed_workspaces=["personal"])
+    related_payload = json.dumps(related.model_dump(mode="json"))
+    assert foreign.record_id not in related_payload
+    assert uri not in related_payload
+    # the malformed row is dropped outright, not merely stripped of its id --
+    # only the pre-existing legitimate evidence link (from problem()) remains.
+    assert related.related == [{"relation": "evidence", "artifact_uri": "doc://m1/problem",
+                                 "record_id": personal.record_id}]
+
+    retrieval = project(journal, tmp_path, name=f"f1-{abs(hash(uri))}.db")
+    reader = scoped_reader(journal, retrieval)
+    result = reader.search(query="Scoped source", workspaces=["personal"], types=["problem"], limit=10,
+                            include_artifacts=True, sensitive_allowed=True)
+    search_payload = json.dumps(result.model_dump(mode="json"))
+    assert foreign.record_id not in search_payload
+    assert uri not in search_payload
+
+    # sanitization must never touch canonical journal state
+    assert journal.read_bytes() == journal_before
+
+    # no error path is exercised by a malformed row (it's silently dropped),
+    # but confirm that directly, too: no exception, no error-detail leak.
+    try:
+        b.get_related(personal.record_id, allowed_workspaces=["personal"])
+    except BrainError as exc:
+        assert foreign.record_id not in json.dumps(exc.details)
+
+
+def test_canonical_record_relation_resolves_within_scope(tmp_path):
+    b, journal, personal, foreign, sensitive = seeded(tmp_path)
+    other_personal = b.record_problem(**problem(statement="Other personal target", workspace="personal",
+                                                  idempotency_key="scope-other-personal"))
+    corrupt_link(journal, personal.record_id, "record://" + other_personal.record_id)
+    related = b.get_related(personal.record_id, allowed_workspaces=["personal"])
+    assert any(row.get("record_id") == other_personal.record_id for row in related.related)
+
+
+def test_canonical_record_relation_to_foreign_workspace_still_filtered(tmp_path):
+    # same canonical shape as the positive case above, pointed cross-workspace
+    # -- the pre-existing B4 filter (not F1) must still reject it.
+    b, journal, personal, foreign, sensitive = seeded(tmp_path)
+    corrupt_link(journal, personal.record_id, "record://" + foreign.record_id)
+    related = b.get_related(personal.record_id, allowed_workspaces=["personal"])
+    assert not any(row.get("record_id") == foreign.record_id for row in related.related)
+
+
+@pytest.mark.parametrize("scheme", ["repo", "git", "doc", "adr", "route", "workspace"])
+def test_non_record_schemes_remain_normal_artifacts_unaffected(tmp_path, scheme):
+    b, journal, personal, foreign, sensitive = seeded(tmp_path)
+    uri = f"{scheme}://something"
+    corrupt_link(journal, personal.record_id, uri, relation="touches")
+    related = b.get_related(personal.record_id, allowed_workspaces=["personal"])
+    assert any(row.get("artifact_uri") == uri and row.get("relation") == "touches" for row in related.related)
+    assert classify_record_uri(uri) == "normal_artifact"
+
+
+# ---------------------------------------------------------------------------
 # Regression: valid same-workspace relations and supersedes must stay visible.
 # ---------------------------------------------------------------------------
 
@@ -282,6 +371,21 @@ def test_valid_same_workspace_link_and_supersede_remain_visible(tmp_path):
 # independently fetchable by the same caller (spec S5.2, invariant I4/I10).
 # ---------------------------------------------------------------------------
 
+def collect_uri_derived_ids(rows):
+    """Scan artifact_uri text directly (independent of any pre-populated
+    record_id field) for canonical record relations. This is the collector
+    half of F1's fix: it must find exactly the same ids the record_id field
+    already carries for canonical rows, and nothing at all for malformed
+    record-like rows, since those must be dropped outright rather than
+    surfaced with a URI string a caller could parse themselves."""
+    ids = set()
+    for row in rows:
+        uri = row.get("artifact_uri")
+        if uri and classify_record_uri(uri) == CANONICAL_RECORD_TARGET:
+            ids.add(record_target_id(uri))
+    return ids
+
+
 def collect_ids_from_search(result):
     ids = set()
     for item in result.results:
@@ -290,6 +394,7 @@ def collect_ids_from_search(result):
         if item.provenance.superseded_by: ids.add(item.provenance.superseded_by)
         for link in item.artifact_links:
             if link.get("record_id"): ids.add(link["record_id"])
+        ids |= collect_uri_derived_ids(item.artifact_links)
     return ids
 
 
@@ -297,6 +402,7 @@ def collect_ids_from_related(result):
     ids = set()
     for row in result.related:
         if row.get("record_id"): ids.add(row["record_id"])
+    ids |= collect_uri_derived_ids(result.related)
     return ids
 
 
@@ -310,6 +416,12 @@ def test_i10_every_expanded_id_is_directly_fetchable_with_same_scope(tmp_path):
     corrupt_supersedes(journal, personal.record_id, foreign.record_id)
     corrupt_link(journal, foreign.record_id, "record://" + personal.record_id, relation="touches")
     corrupt_link(journal, personal.record_id, "record://rec-does-not-exist")
+    # F1: scheme-variant / malformed record-like URIs embedding the same
+    # corrupt ids, planted alongside the canonical corrupt shapes above --
+    # I10 must catch leaks through raw artifact_uri text, not just through
+    # structured record_id fields (that's exactly where F1 leaked).
+    corrupt_link(journal, personal.record_id, "Record://" + foreign.record_id, relation="touches")
+    corrupt_link(journal, personal.record_id, "record:/rec-does-not-exist", relation="addresses")
 
     # A single consistent grant for this caller, reused for every expansion
     # path and for the direct-fetch replay below -- I10 compares apples to
@@ -326,6 +438,14 @@ def test_i10_every_expanded_id_is_directly_fetchable_with_same_scope(tmp_path):
 
     forbidden = {foreign.record_id, "rec-does-not-exist", "rec-hidden-status"}
     assert not (ids & forbidden), f"scope leak: {ids & forbidden}"
+
+    # Raw substring scan over the whole serialized response: a malformed
+    # record-like URI is never classified/extracted, so it would never show
+    # up in the structured `ids` set above even if it leaked -- it must be
+    # entirely absent from the response text instead.
+    payload_text = json.dumps(related.model_dump(mode="json")) + json.dumps(result.model_dump(mode="json"))
+    for fid in forbidden:
+        assert fid not in payload_text, f"raw id leak in serialized response: {fid}"
 
     for record_id in ids:
         b.get_record(record_id, allowed_workspaces=allowed, sensitive_allowed=sensitive_allowed, sensitive_workspaces=sensitive_ws)  # must not raise
@@ -349,3 +469,76 @@ def test_mcp_server_source_never_references_unrestricted_operator_scope():
     assert "UNRESTRICTED_OPERATOR_SCOPE" not in source
     import brain.mcp_server as mcp_module
     assert not hasattr(mcp_module, "UNRESTRICTED_OPERATOR_SCOPE")
+
+
+def _brain_module_path(module_name, package="brain"):
+    rel = module_name[len(package) + 1:] if module_name != package else "__init__"
+    return ROOT / package / (rel.replace(".", "/") + ".py")
+
+
+def _direct_brain_imports(module_path, package="brain"):
+    """First-party brain.* module names this file imports directly (relative
+    or absolute)."""
+    tree = ast.parse(module_path.read_text())
+    imports = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.level and node.level >= 1:  # relative: `.config`, `. ` (bare package)
+                if node.module: imports.add(f"{package}.{node.module}")
+                else:
+                    for alias in node.names: imports.add(f"{package}.{alias.name}")
+            elif node.module == package:
+                for alias in node.names: imports.add(f"{package}.{alias.name}")
+            elif node.module and node.module.startswith(package + "."):
+                imports.add(node.module)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == package or alias.name.startswith(package + "."):
+                    imports.add(alias.name)
+    return imports
+
+
+def _transitive_brain_imports(entry_module, package="brain", exclude=frozenset()):
+    """Every brain.* module reachable from entry_module by direct or
+    transitive import, excluding `exclude` (and anything only reachable
+    through it)."""
+    seen, stack = set(), [entry_module]
+    while stack:
+        name = stack.pop()
+        if name in seen or name in exclude: continue
+        seen.add(name)
+        path = _brain_module_path(name, package)
+        if not path.is_file(): continue
+        stack.extend(_direct_brain_imports(path, package) - seen)
+    return seen
+
+
+def test_mcp_transitive_imports_never_reference_unrestricted_operator_scope():
+    """F3 (package-5-scope-safe-retrieval-review.md): the guard above reads
+    only brain/mcp_server.py's source text, so it would silently stop
+    covering the sentinel if MCP tool bodies were ever moved into a helper
+    module. This walks the real import graph -- every brain.* module
+    mcp_server.py imports, directly or transitively, except brain.api itself
+    (where the sentinel is defined and legitimately named) -- and asserts
+    none of them contains a Name/Attribute reference to
+    UNRESTRICTED_OPERATOR_SCOPE or a `from brain.api import *` that could
+    reintroduce it anonymously."""
+    modules = _transitive_brain_imports("brain.mcp_server", exclude={"brain.api"})
+    modules.add("brain.mcp_server")
+    offenders = []
+    for name in sorted(modules):
+        path = _brain_module_path(name)
+        if not path.is_file(): continue
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and node.id == "UNRESTRICTED_OPERATOR_SCOPE":
+                offenders.append((name, node.lineno, "Name"))
+            elif isinstance(node, ast.Attribute) and node.attr == "UNRESTRICTED_OPERATOR_SCOPE":
+                offenders.append((name, node.lineno, "Attribute"))
+            elif isinstance(node, ast.ImportFrom) and node.module == "brain.api" and any(a.name == "*" for a in node.names):
+                offenders.append((name, node.lineno, "star-import of brain.api"))
+            elif isinstance(node, ast.ImportFrom) and any(a.name == "UNRESTRICTED_OPERATOR_SCOPE" for a in node.names):
+                # catches `from brain.api import UNRESTRICTED_OPERATOR_SCOPE as X`,
+                # which the Name check above can't see once it's rebound to X
+                offenders.append((name, node.lineno, "aliased import of UNRESTRICTED_OPERATOR_SCOPE"))
+    assert not offenders, f"UNRESTRICTED_OPERATOR_SCOPE reachable from mcp_server.py via: {offenders}"
