@@ -18,3 +18,9 @@ Hermes is configured under `mcp_servers.pavol-brain` in `~/.hermes/config.yaml`;
 Agents preserve `record_id`, `source_event_id`, projection hash, and retrieval build ID. Profiles are bound to `personal`, `work`, or the read-only migration fallback `legacy`; a request cannot choose the instance. Runtime logs stay outside Git. ChatGPT remains outside this MVP.
 
 Live status: Hermes 0.18.2 passed a real agent retrieval and preserved record/event provenance. Codex CLI 0.144.0 configured and its MCP definition is present, but the real agent smoke failed first on a missing `codex-code-mode-host` and then client-cancelled the direct call, so it is not an acceptance pass. Claude Desktop 1.20186.1 is configured but has no installed scriptable CLI for a real-agent smoke, so execution is not evaluated.
+
+## Record-to-record references
+
+A write can only point at another record through the typed `links` field on `brain_record_outcome`/`brain_record_decision` (`{"target_record_id": ..., "relation": "addresses"|"analyzes"|"decides"|"implements"|"results_in"|"caused_by"}`). The server resolves every link at write time — inside the same transaction as the rest of the write — and rejects it if the target does not exist, does not share the source's workspace, or is `rejected`/`forgotten`; a rejected link leaves no row anywhere.
+
+`record://` is **not** an accepted artifact/evidence URI scheme. `evidence`, `artifacts`, `commit`, and `alternatives[].evidence` accept only `repo://`, `git://`, `adr://`, `route://`, `doc://`, and `workspace://` URIs — a `record://` value in any of these fields is rejected as an invalid URI, whether or not the record it names exists. Point at another record with `links`, not with an evidence/artifact URI.

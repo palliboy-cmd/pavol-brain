@@ -26,7 +26,7 @@ DENY_TEXT_PATTERNS = (
     re.compile(r"(?i)\b(?:chain[- ]of[- ]thought|hidden reasoning|internal reasoning)\b"),
     re.compile(r"(?m)^Traceback \(most recent call last\):"),
 )
-URI_RE = re.compile(r"^(?:repo|git|adr|route|doc|workspace|record)://[^\s]+$")
+URI_RE = re.compile(r"^(?:repo|git|adr|route|doc|workspace)://[^\s]+$")
 
 def _entropy(value: str) -> float:
     counts = Counter(value)

@@ -185,6 +185,108 @@ def test_search_filters_corrupt_cross_workspace_related_record_ids(tmp_path):
     row=next(item for item in result.results if item.record_id==personal.record_id)
     assert not any(link.get("record_id")==foreign.record_id for link in row.artifact_links)
 
+def test_record_uri_is_rejected_in_evidence_artifacts_commit_and_alternatives_evidence(tmp_path):
+    b, journal = brain(tmp_path)
+    same_ws = b.record_problem(statement="Existing same-workspace record", impact="test",
+                                source_assertion="explicit_user_confirmation", workspace="personal")
+    foreign_ws = b.record_problem(statement="Existing foreign-workspace record", impact="test",
+                                   source_assertion="explicit_user_confirmation", workspace="ai-pos")
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+
+    targets = {
+        "dangling": "record://rec-does-not-exist",
+        "same_workspace": "record://" + same_ws.record_id,
+        "foreign_workspace": "record://" + foreign_ws.record_id,
+    }
+
+    def counts(con):
+        return tuple(con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
+                     for t in ("memory_records", "memory_events", "record_state", "artifact_links"))
+
+    for case, uri in targets.items():
+        con = sqlite3.connect(journal)
+        before = counts(con)
+        con.close()
+
+        with pytest.raises(BrainError, match="BRAIN_INVALID_ARTIFACT_URI") as exc:
+            b.record_problem(statement=f"evidence {case}", impact="test", evidence=[uri],
+                              source_assertion="explicit_user_confirmation", workspace="personal",
+                              idempotency_key=f"evidence-{case}")
+        assert exc.value.details["values"] == [uri]
+
+        with pytest.raises(BrainError, match="BRAIN_INVALID_ARTIFACT_URI"):
+            b.record_outcome(**outcome(artifacts=[uri], idempotency_key=f"artifacts-{case}"))
+
+        with pytest.raises(BrainError, match="BRAIN_INVALID_ARTIFACT_URI"):
+            b.record_outcome(**outcome(artifacts=[], commit=uri, idempotency_key=f"commit-{case}"))
+
+        with pytest.raises(BrainError, match="BRAIN_INVALID_ARTIFACT_URI"):
+            b.record_decision(statement="A decision", rationale="Because", verdict="accepted", reason="test",
+                               alternatives=[{"option": "alt", "verdict": "rejected", "reason": "no",
+                                              "evidence": [uri]}],
+                               source_assertion="explicit_user_confirmation", workspace="personal",
+                               idempotency_key=f"alt-evidence-{case}")
+
+        con = sqlite3.connect(journal)
+        after = counts(con)
+        con.close()
+        assert after == before, f"partial write leaked for case={case}"
+
+def test_record_scheme_removed_from_uri_policy_does_not_affect_typed_links(tmp_path):
+    from brain.write_policy import URI_RE
+    assert not URI_RE.fullmatch("record://rec_anything")
+    assert URI_RE.fullmatch("doc://x") and URI_RE.fullmatch("repo://x") and URI_RE.fullmatch("git://x")
+    b, journal = brain(tmp_path)
+    problem = b.record_problem(statement="Agents lose context", impact="Repeated explanation",
+                                evidence=["doc://m1/problem"], source_assertion="explicit_user_confirmation",
+                                workspace="personal")
+    decision = b.record_decision(statement="Use separate Brain instances", rationale="Isolation by construction",
+                                  verdict="accepted", reason="zero leak", evidence=["doc://m1/decision"],
+                                  links=[{"target_record_id": problem.record_id, "relation": "addresses"}],
+                                  source_assertion="explicit_user_confirmation", workspace="personal")
+    assert decision.status == "accepted"
+    con = sqlite3.connect(journal); con.row_factory = sqlite3.Row
+    link = con.execute("SELECT artifact_uri,relation FROM artifact_links WHERE record_id=? AND artifact_uri LIKE 'record://%'",
+                        (decision.record_id,)).fetchone()
+    assert tuple(link) == ("record://" + problem.record_id, "addresses")
+    incoming = b.get_related(problem.record_id).related
+    assert any(row.get("direction") == "incoming" and row["record_id"] == decision.record_id for row in incoming)
+    with pytest.raises(BrainError, match="BRAIN_LINK_TARGET_NOT_FOUND"):
+        b.record_decision(statement="Dangling link", rationale="test", verdict="accepted", reason="test",
+                           links=[{"target_record_id": "rec-does-not-exist", "relation": "addresses"}],
+                           source_assertion="explicit_user_confirmation", workspace="personal")
+    foreign = b.record_problem(statement="Foreign target", impact="test",
+                                source_assertion="explicit_user_confirmation", workspace="ai-pos")
+    with pytest.raises(BrainError, match="BRAIN_CROSS_WORKSPACE_LINK_DENIED"):
+        b.record_decision(statement="Cross-workspace link", rationale="test", verdict="accepted", reason="test",
+                           links=[{"target_record_id": foreign.record_id, "relation": "addresses"}],
+                           source_assertion="explicit_user_confirmation", workspace="personal")
+
+def test_b3_probe_rerun_record_uri_evidence_is_rejected(tmp_path):
+    """Appendix A probe 1 re-run: baseline (pre-Package-2) accepted both of
+    these into an accepted Band-A record and persisted artifact_links rows;
+    both must now be rejected and nothing must be persisted."""
+    b, journal = brain(tmp_path)
+    foreign = b.record_problem(statement="Foreign-workspace record for the B3 probe", impact="test",
+                                source_assertion="explicit_user_confirmation", workspace="ai-pos")
+
+    def link_row_count():
+        con = sqlite3.connect(journal)
+        try:
+            return con.execute("SELECT count(*) FROM artifact_links WHERE artifact_uri LIKE 'record://%'").fetchone()[0]
+        finally:
+            con.close()
+
+    before = link_row_count()
+    with pytest.raises(BrainError, match="BRAIN_INVALID_ARTIFACT_URI"):
+        b.record_problem(statement="probe dangling", impact="test", evidence=["record://rec-does-not-exist"],
+                          source_assertion="explicit_user_confirmation", workspace="personal")
+    with pytest.raises(BrainError, match="BRAIN_INVALID_ARTIFACT_URI"):
+        b.record_problem(statement="probe foreign workspace", impact="test",
+                          evidence=["record://" + foreign.record_id],
+                          source_assertion="explicit_user_confirmation", workspace="personal")
+    assert link_row_count() == before
+
 def test_m1_schema_migration_preserves_rows_and_requires_backup(tmp_path):
     old=tmp_path/"old.db";schema=(ROOT/"spike/schema/journal.sql").read_text()
     schema=schema.replace("'problem','analysis',","").replace("PRAGMA user_version=2;","PRAGMA user_version=1;")
