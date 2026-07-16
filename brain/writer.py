@@ -103,10 +103,14 @@ class JournalWriter:
             for alternative in payload.get("alternatives", []): evidence.extend(alternative.get("evidence", []))
         artifacts = list(payload.get("artifacts", []))
         if payload.get("commit"): artifacts.append(payload["commit"])
-        validate_evidence_uris(evidence, request_id)
-        validate_evidence_uris(artifacts, request_id, "artifacts")
+        # F2: every client-controlled string must clear the secret gate before
+        # any error path that can echo it -- including the URI-syntax error's
+        # `details.values`. A bare (non-URI-shaped) secret in evidence/artifacts
+        # would otherwise fail URI syntax first and be echoed back verbatim.
         provenance = {key: metadata.get(key) for key in ("source_assertion", "source_excerpt", "source_ref", "session_ref")}
         enforce_band_c({"payload":payload,"client_metadata":metadata}, provenance, request_id)
+        validate_evidence_uris(evidence, request_id)
+        validate_evidence_uris(artifacts, request_id, "artifacts")
         artifact_results=verify_all(artifacts,self.config.artifact_repo_roots or {})
         band, status, review, confidence = classify(record_type, payload, metadata["source_assertion"], metadata.get("source_ref"), request_id,artifact_results)
         if metadata.get("supersedes") and not metadata.get("change_reason"):

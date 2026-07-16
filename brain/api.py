@@ -122,6 +122,7 @@ class Brain:
     def _record(self,model,record_type,request=None,*,allowed_workspaces=None,request_id=None,**kwargs):
         validate_request_id(request_id)
         started=time.perf_counter();request_id=request_id or "uuid4-compat:"+str(uuid.uuid4())
+        sanitized_error=None
         try:
             if isinstance(request,model):value=request
             elif request is None:value=model(**kwargs)
@@ -141,16 +142,23 @@ class Brain:
                              total_latency_ms=round((time.perf_counter()-started)*1000,3));raise
         except Exception as exc:
             from pydantic import ValidationError
-            if isinstance(exc,ValidationError):
-                # B6: pydantic's default rendering of a validation error echoes the
-                # offending raw value (e.g. a rejected verification key), so a
-                # secret-shaped value must never be forwarded into response details.
-                text=str(exc)
-                details={} if looks_like_secret(text) else {"validation":text}
-                error=BrainError("BRAIN_INVALID_REQUEST","invalid write request",request_id,details)
-                self.audit.write("record_"+record_type,request_id=request_id,error_code=error.code,instance_id=self.config.instance_id)
-                raise error from None
-            raise
+            if not isinstance(exc,ValidationError): raise
+            # B6/F1: pydantic's default rendering of a validation error echoes the
+            # offending raw value (e.g. a rejected verification key), so a
+            # secret-shaped value must never be forwarded into response details.
+            # The sanitized BrainError is raised below, after this except block
+            # has exited, so it never chains onto the original ValidationError:
+            # Python only attaches the currently-handled exception as
+            # __context__ for a raise executed *inside* an except block, and
+            # `from None` only hides the chain from renderers -- it leaves
+            # __context__ populated. Falling out of the block first means the
+            # ValidationError is no longer "currently handled" by the time we
+            # raise, so __context__ is None for real, not just suppressed.
+            text=str(exc)
+            details={} if looks_like_secret(text) else {"validation":text}
+            sanitized_error=BrainError("BRAIN_INVALID_REQUEST","invalid write request",request_id,details)
+            self.audit.write("record_"+record_type,request_id=request_id,error_code=sanitized_error.code,instance_id=self.config.instance_id)
+        raise sanitized_error
     def record_outcome(self,request=None,**kwargs): return self._record(OutcomeRequest,"outcome",request,**kwargs)
     def record_decision(self,request=None,**kwargs): return self._record(DecisionRequest,"decision",request,**kwargs)
     def record_problem(self,request=None,**kwargs): return self._record(ProblemRequest,"problem",request,**kwargs)

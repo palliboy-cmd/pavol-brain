@@ -86,3 +86,40 @@ def test_b7_probe_rerun_invalid_request_id_rejected_before_policy_denial_audit(t
     assert CANARY not in json.dumps(result) and "sk-live" not in json.dumps(result)
     audit_bytes = audit_log.read_bytes() if audit_log.exists() else b""
     assert CANARY.encode() not in audit_bytes and b"sk-live" not in audit_bytes
+
+
+def test_f2b_probe_mcp_verification_secret_key_nonstring_value_no_pre_body_leak(tmp_path):
+    """F2b reproducer, through the real MCP tool boundary (not just the
+    domain layer): brain_record_outcome's raw FastMCP signature used to type
+    verification as dict[str, str]. A secret-shaped key paired with a
+    non-string value failed FastMCP's own pre-body pydantic validation --
+    built from the raw tool signature, running before this codebase's tool
+    body and its Band C sanitization ever execute -- and raised a ToolError
+    whose message embedded the raw key twice (loc path + input_value).
+    verification's raw-boundary value type is now Any, so no pre-body nested
+    validation runs; the domain model (OutcomeRequest.verification,
+    brain/models.py) still enforces dict[VerificationKey, str], so the
+    non-string value is rejected inside the tool body through the same
+    sanitized-error path (F1) as every other write validation failure."""
+    from test_brain_write import brain_with_audit
+    b, journal, audit_log = brain_with_audit(tmp_path)
+    mcp = create_server(policy=CapabilityPolicy(frozenset(["personal"]), write_enabled=True), brain=b)
+
+    secret_key = "sk-live-fakeFAKE1234567890fake"
+    try:
+        result = call(mcp, "brain_record_outcome", {
+            "summary": "x", "workspace": "personal",
+            "verification": {secret_key: 123},
+            "source_assertion": "explicit_user_confirmation",
+        })
+    except Exception as exc:
+        raise AssertionError(f"pre-body FastMCP validation leaked instead of a controlled tool-body error: {exc!r}") from None
+
+    assert result["error"]["code"] == "BRAIN_INVALID_REQUEST"
+    assert result["error"]["details"] == {}
+    payload = json.dumps(result)
+    assert secret_key not in payload and "sk-live" not in payload
+    journal_bytes = journal.read_bytes()
+    assert secret_key.encode() not in journal_bytes and b"sk-live" not in journal_bytes
+    audit_bytes_ = audit_log.read_bytes() if audit_log.exists() else b""
+    assert secret_key.encode() not in audit_bytes_ and b"sk-live" not in audit_bytes_

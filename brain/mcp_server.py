@@ -2,7 +2,7 @@
 import os
 import uuid
 from dataclasses import dataclass
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field, ValidationError
@@ -122,7 +122,16 @@ def create_server(config=None, policy=None, brain=None):
 
     @mcp.tool(name="brain_record_outcome")
     def brain_record_outcome(summary: str, workspace: str | None = None, changes: list[str] | None = None,
-                             verification: dict[str,str] | None = None, open_questions: list[str] | None = None,
+                             # F2b: verification's *values* stay untyped (`Any`) on this raw FastMCP
+                             # boundary on purpose. FastMCP builds its own pre-body pydantic model
+                             # from this signature and raises a ToolError that embeds the raw dict
+                             # key before the tool body -- and before this codebase's own
+                             # sanitization -- ever runs, for a secret-shaped key paired with a
+                             # non-string value. The domain model (OutcomeRequest.verification,
+                             # brain/models.py) still requires `dict[VerificationKey, str]`; a
+                             # non-string value is rejected inside the tool body via the same
+                             # sanitized-error path as every other write validation failure (F1).
+                             verification: dict[str,Any] | None = None, open_questions: list[str] | None = None,
                              artifacts: list[str] | None = None, commit: str | None = None,
                              source_assertion: Literal["explicit_user_command","explicit_user_confirmation","verified_tool_result","authoritative_document","agent_inference"] = "agent_inference",
                              source_excerpt: str | None = None, source_ref: str | None = None, session_ref: str | None = None,

@@ -2,6 +2,7 @@ import hashlib
 import json
 import sqlite3
 import sys
+import traceback
 from pathlib import Path
 
 import pytest
@@ -613,3 +614,59 @@ def test_secret_non_persistence_matrix(tmp_path):
     err = exc_info.value
     assert err.code == "BRAIN_INVALID_REQUEST" and err.request_id == ""
     assert row_counts(journal) == before
+
+def test_f1_sanitized_write_error_carries_no_exception_context(tmp_path):
+    """F1: `raise ... from None` only suppresses the chain in default
+    renderers -- __context__ is still populated with the raw pydantic
+    ValidationError, which itself echoes the offending secret verification
+    key (see test_b6_probe_rerun_verification_key_with_equals_is_rejected_
+    without_leaking for that echo). A debugger or error-reporting SDK that
+    walks __context__/__cause__ unconditionally, ignoring __suppress_
+    context__, would still re-expose the canary. The sanitized BrainError
+    must carry no reference to the original exception at all."""
+    b,journal=brain(tmp_path)
+    before=row_counts(journal)
+    with pytest.raises(BrainError) as exc_info:
+        b.record_outcome(**outcome(verification={CANARY: "ok"}, idempotency_key="f1-context-probe"))
+    err=exc_info.value
+    assert err.code == "BRAIN_INVALID_REQUEST"
+    assert err.__context__ is None, f"__context__ still references {err.__context__!r}"
+    assert err.__cause__ is None
+    tb_text = "".join(traceback.format_exception(type(err), err, err.__traceback__))
+    for surface in (str(err), repr(err), tb_text, json.dumps(err.details)):
+        assert CANARY not in surface and "sk-live" not in surface
+    assert row_counts(journal) == before
+
+def test_f2_bare_secret_in_artifact_fields_is_secret_rejected_not_uri_echoed(tmp_path):
+    """F2: validate_evidence_uris used to run before enforce_band_c, so a
+    bare (non-URI-shaped) secret in evidence[]/artifacts[]/commit/
+    alternatives[].evidence[] failed URI syntax first and echoed the raw
+    value verbatim in details.values (BRAIN_INVALID_ARTIFACT_URI). Band C
+    now runs first over the whole write envelope, so every position here
+    must be rejected as BRAIN_WRITE_SECRET_REJECTED with nothing echoed."""
+    b,journal,audit_log=brain_with_audit(tmp_path)
+
+    cases = {
+        "evidence": lambda: b.record_problem(**problem(evidence=[CANARY], idempotency_key="f2-evidence")),
+        "artifacts": lambda: b.record_outcome(**outcome(artifacts=[CANARY], idempotency_key="f2-artifacts")),
+        "commit": lambda: b.record_outcome(**outcome(artifacts=[], commit=CANARY, idempotency_key="f2-commit")),
+        "alternatives_evidence": lambda: b.record_decision(**decision(
+            alternatives=[{"option":"x","verdict":"rejected","reason":"ok","evidence":[CANARY]}],
+            idempotency_key="f2-alt-evidence")),
+    }
+
+    for label, run in cases.items():
+        before=row_counts(journal)
+        with pytest.raises(BrainError) as exc_info:
+            run()
+        err=exc_info.value
+        assert err.code == "BRAIN_WRITE_SECRET_REJECTED", f"{label}: got {err.code} (details={err.details})"
+        assert CANARY not in str(err) and CANARY not in repr(err), f"{label}: canary leaked in error text"
+        assert CANARY not in json.dumps(err.details), f"{label}: canary leaked in error details"
+        assert err.__context__ is None, f"{label}: __context__ still references {err.__context__!r}"
+        assert row_counts(journal) == before, f"{label}: rejected write left persistent rows"
+
+    journal_bytes = Path(journal).read_bytes()
+    assert CANARY.encode() not in journal_bytes and b"sk-live" not in journal_bytes
+    audit = audit_bytes(audit_log)
+    assert CANARY.encode() not in audit and b"sk-live" not in audit
