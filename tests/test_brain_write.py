@@ -42,6 +42,17 @@ def outcome(**overrides):
             "artifacts":["repo://pavol-brain/brain/api.py"],"source_assertion":"verified_tool_result",
             "workspace":"personal",**overrides}
 
+def row_counts(journal):
+    con=sqlite3.connect(journal)
+    counts=tuple(con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
+                 for t in ("memory_records","memory_events","record_state","artifact_links"))
+    con.close();return counts
+
+def created_event(journal,record_id):
+    con=sqlite3.connect(journal)
+    row=con.execute("SELECT event_id,data FROM memory_events WHERE record_id=? AND event_type='record_created'",(record_id,)).fetchone()
+    con.close();return row
+
 def test_policy_bands_secret_filter_idempotency_and_provenance(tmp_path):
     b,journal=brain(tmp_path)
     accepted=b.record_outcome(**outcome(idempotency_key="same"));again=b.record_outcome(**outcome(idempotency_key="same"))
@@ -73,6 +84,98 @@ def test_idempotency_is_agent_namespaced_and_semantic_duplicates_are_candidates(
     con=sqlite3.connect(journal)
     event=json.loads(con.execute("SELECT data FROM memory_events WHERE record_id=? AND event_type='record_created'",(other.record_id,)).fetchone()[0])
     assert event["possible_duplicate_of"]==first.record_id
+
+def test_idempotent_replay_returns_original_record_and_writes_no_new_rows(tmp_path):
+    b,journal=brain(tmp_path)
+    first=b.record_outcome(**outcome(idempotency_key="replay-key"))
+    before=row_counts(journal)
+    again=b.record_outcome(**outcome(idempotency_key="replay-key"))
+    assert again.idempotent and again.record_id==first.record_id and again.event_id==first.event_id
+    assert row_counts(journal)==before
+
+def test_idempotency_explicit_key_metadata_conflict_matrix(tmp_path):
+    # §10 row 17b: same explicit key, same payload, metadata alone diverges.
+    b,journal=brain(tmp_path)
+    target=b.record_outcome(**outcome(idempotency_key="meta-conflict-target"))
+    linkable=b.record_problem(statement="Linkable problem",impact="referenced by the link-metadata conflict case",
+                              evidence=["doc://m1/linkable"],source_assertion="explicit_user_confirmation",workspace="personal")
+    first=b.record_outcome(**outcome(idempotency_key="meta-conflict-key"))
+    before=row_counts(journal)
+    original_event=created_event(journal,first.record_id)
+    variants=[
+        {"session_ref":"different-session"},
+        {"source_ref":"different-source"},
+        {"valid_at":"2026-07-11T00:00:00+00:00"},
+        {"links":[{"target_record_id":linkable.record_id,"relation":"addresses"}]},
+        {"supersedes":target.record_id,"change_reason":"pin metadata conflict"},
+    ]
+    for variant in variants:
+        with pytest.raises(BrainError,match="BRAIN_IDEMPOTENCY_CONFLICT"):
+            b.record_outcome(**outcome(idempotency_key="meta-conflict-key",**variant))
+        assert row_counts(journal)==before
+    assert created_event(journal,first.record_id)==original_event
+
+def test_idempotency_legacy_row_without_request_hash_forces_conflict(tmp_path):
+    # B8 probe: a stored record_created event missing request_hash must never
+    # be treated as a safe idempotent replay, even for the original payload.
+    b,journal=brain(tmp_path)
+    original=b.record_outcome(**outcome(idempotency_key="legacy-probe-key"))
+    con=sqlite3.connect(journal)
+    event_id,data=con.execute("SELECT event_id,data FROM memory_events WHERE record_id=? AND event_type='record_created'",(original.record_id,)).fetchone()
+    corrupted=json.loads(data);del corrupted["request_hash"]
+    con.execute("UPDATE memory_events SET data=? WHERE event_id=?",(json.dumps(corrupted),event_id))
+    con.commit();con.close()
+    before=row_counts(journal)
+    with pytest.raises(BrainError) as excinfo:
+        b.record_outcome(**outcome(idempotency_key="legacy-probe-key",session_ref="different-session"))
+    assert excinfo.value.code=="BRAIN_IDEMPOTENCY_CONFLICT"
+    assert excinfo.value.details.get("reason")=="legacy_record_without_request_hash"
+    assert row_counts(journal)==before
+    con=sqlite3.connect(journal)
+    stored=json.loads(con.execute("SELECT data FROM memory_events WHERE event_id=?",(event_id,)).fetchone()[0])
+    con.close()
+    assert stored==corrupted
+
+def test_idempotency_explicit_key_across_workspace_and_type_conflicts(tmp_path):
+    # §10 row 17d: an explicit key names one logical write; reuse across
+    # workspace or record type is a conflict, never a fork.
+    b,journal=brain(tmp_path)
+    b.record_outcome(**outcome(idempotency_key="cross-scope-key",workspace="personal"))
+    before=row_counts(journal)
+    with pytest.raises(BrainError,match="BRAIN_IDEMPOTENCY_CONFLICT"):
+        b.record_outcome(**outcome(idempotency_key="cross-scope-key",workspace="ai-pos"))
+    assert row_counts(journal)==before
+    with pytest.raises(BrainError,match="BRAIN_IDEMPOTENCY_CONFLICT"):
+        b.record_problem(statement="Different type reusing the same explicit key",impact="pin cross-type key reuse",
+                         evidence=["doc://m1/cross-type"],source_assertion="explicit_user_confirmation",
+                         workspace="personal",idempotency_key="cross-scope-key")
+    assert row_counts(journal)==before
+
+def test_idempotency_no_explicit_key_cross_workspace_produces_independent_records(tmp_path):
+    # §10 row 18: same content, different workspaces, no explicit key.
+    b,journal=brain(tmp_path)
+    before=row_counts(journal)
+    personal=b.record_outcome(**outcome(workspace="personal"))
+    other=b.record_outcome(**outcome(workspace="ai-pos"))
+    assert personal.record_id!=other.record_id
+    assert personal.status=="accepted" and other.status=="accepted"
+    assert row_counts(journal)==tuple(x+2 for x in before)
+
+def test_idempotency_supersede_replay_supersedes_target_exactly_once(tmp_path):
+    # §10 row 19: identical supersede replay returns the original result;
+    # the target is superseded exactly once, never a second supersede event.
+    b,journal=brain(tmp_path)
+    target=b.record_outcome(**outcome(idempotency_key="supersede-replay-target"))
+    kwargs=outcome(summary="Superseding outcome",idempotency_key="supersede-replay-key",
+                   supersedes=target.record_id,change_reason="pin supersede replay")
+    first=b.record_outcome(**kwargs)
+    before=row_counts(journal)
+    again=b.record_outcome(**kwargs)
+    assert again.idempotent and again.record_id==first.record_id
+    assert row_counts(journal)==before
+    con=sqlite3.connect(journal)
+    assert con.execute("SELECT count(*) FROM memory_events WHERE record_id=? AND event_type='record_superseded'",(target.record_id,)).fetchone()[0]==1
+    assert tuple(con.execute("SELECT status,superseded_by FROM record_state WHERE record_id=?",(target.record_id,)).fetchone())==("superseded",first.record_id)
 
 def test_instance_namespace_and_library_mapping_are_enforced(tmp_path):
     personal_dir=tmp_path/"personal-instance";work_dir=tmp_path/"work-instance";personal_dir.mkdir();work_dir.mkdir()

@@ -66,7 +66,11 @@ class JournalWriter:
         if row["content_hash"] != content_hash:
             raise BrainError("BRAIN_IDEMPOTENCY_CONFLICT", "idempotency key was already used for different content", request_id)
         created=json.loads(row["created_event_data"] or "{}")
-        if created.get("request_hash") and created["request_hash"]!=request_hash:
+        stored_request_hash = created.get("request_hash")
+        if not stored_request_hash:
+            raise BrainError("BRAIN_IDEMPOTENCY_CONFLICT", "idempotency key was already used by a legacy record with no stored request_hash",
+                             request_id, {"reason": "legacy_record_without_request_hash"})
+        if stored_request_hash != request_hash:
             raise BrainError("BRAIN_IDEMPOTENCY_CONFLICT", "idempotency key was already used for a different write request", request_id)
         initial_status=created.get("status","candidate");initial_review=created.get("review","pending")
         band = "A" if initial_status == "accepted" else "B"
@@ -113,7 +117,8 @@ class JournalWriter:
         created_at = now()
         valid_at = parse_time(metadata["valid_at"], request_id) if metadata.get("valid_at") else created_at
         content_hash = hashlib.sha256(canonical({"type": record_type, "workspace": workspace, "payload": payload}).encode()).hexdigest()
-        request_hash = hashlib.sha256(canonical({"instance_id":self.config.instance_id,"agent_id":agent_id,"content_hash":content_hash,"sensitivity":metadata["sensitivity"],
+        request_hash = hashlib.sha256(canonical({"instance_id":self.config.instance_id,"agent_id":agent_id,"record_type":record_type,
+            "workspace":workspace,"content_hash":content_hash,"sensitivity":metadata["sensitivity"],
             "source_assertion":metadata["source_assertion"],"source_excerpt":metadata.get("source_excerpt"),
             "source_ref":metadata.get("source_ref"),"session_ref":metadata.get("session_ref"),
             "valid_at":metadata.get("valid_at"),"supersedes":metadata.get("supersedes"),
