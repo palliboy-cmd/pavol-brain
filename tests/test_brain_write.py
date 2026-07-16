@@ -285,7 +285,7 @@ def test_decision_payload_record_links_and_supersede_are_append_only(tmp_path):
         verdict="accepted",reason="zero leak",reopen_when=None,evidence=["doc://m1/decision"],
         links=[{"target_record_id":problem.record_id,"relation":"addresses"}],source_assertion="explicit_user_confirmation",workspace="personal",idempotency_key="first-decision")
     assert repeated.idempotent and repeated.record_id==first.record_id and repeated.status=="accepted"
-    incoming=b.get_related(problem.record_id).related
+    incoming=b.get_related(problem.record_id,allowed_workspaces=["personal"]).related
     assert any(row.get("direction")=="incoming" and row["record_id"]==first.record_id for row in incoming)
 
 def test_problem_analysis_project_and_old_baseline_hashes_stay_stable(tmp_path):
@@ -385,7 +385,7 @@ def test_record_scheme_removed_from_uri_policy_does_not_affect_typed_links(tmp_p
     link = con.execute("SELECT artifact_uri,relation FROM artifact_links WHERE record_id=? AND artifact_uri LIKE 'record://%'",
                         (decision.record_id,)).fetchone()
     assert tuple(link) == ("record://" + problem.record_id, "addresses")
-    incoming = b.get_related(problem.record_id).related
+    incoming = b.get_related(problem.record_id,allowed_workspaces=["personal"]).related
     assert any(row.get("direction") == "incoming" and row["record_id"] == decision.record_id for row in incoming)
     with pytest.raises(BrainError, match="BRAIN_LINK_TARGET_NOT_FOUND"):
         b.record_decision(statement="Dangling link", rationale="test", verdict="accepted", reason="test",

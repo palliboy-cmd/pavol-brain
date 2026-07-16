@@ -11,6 +11,19 @@ from .runtime import RuntimeInspector
 from .writer import JournalWriter
 from .write_policy import validate_request_id, looks_like_secret
 
+class _UnrestrictedOperatorScope:
+    """Trusted full-access sentinel for local operator/diagnostic tooling only.
+
+    Passing this object as `allowed_workspaces` bypasses workspace and
+    sensitivity scoping entirely. It must never be imported or used in
+    brain/mcp_server.py -- MCP callers always pass an explicit resolved
+    workspace list. grep-friendly by name: UNRESTRICTED_OPERATOR_SCOPE.
+    """
+    __slots__ = ()
+    def __repr__(self): return "UNRESTRICTED_OPERATOR_SCOPE"
+
+UNRESTRICTED_OPERATOR_SCOPE = _UnrestrictedOperatorScope()
+
 class HttpEmbeddingTransport:
     def __init__(self,config): self.config=config
     def embed(self,text):
@@ -69,40 +82,64 @@ class Brain:
             if not journal: raise BrainError("BRAIN_PROVENANCE_CORRUPT","journal provenance is missing",req.request_id,{"record_id":row["record_id"]})
             event=journal.get("updated_event_id")
             if not event: raise BrainError("BRAIN_PROVENANCE_CORRUPT","source event is missing",req.request_id,{"record_id":row["record_id"]})
-            links=self._scope_related(self.repository.related(row["record_id"]),req.workspaces,req.sensitive_allowed,
-                                      req.workspaces if req.sensitive_allowed else []) if req.include_artifacts else []
-            title=row["title"]; results.append(SearchResult(record_id=row["record_id"],score=score,rank=n,workspace=row["workspace"],type=row["type"],sensitivity=row["sensitivity"],status=row["status"],valid_at=row["valid_at"],invalid_at=row["invalid_at"],is_current=row["status"]=="accepted" and not row["invalid_at"],title=title,snippet=title[:240],provenance=Provenance(journal_record_id=row["record_id"],source_event_id=event,projection_hash=row["projection_hash"],supersedes=journal.get("supersedes"),superseded_by=journal.get("superseded_by")),artifact_links=links,projection_hash=row["projection_hash"],embedding_model=meta["embedding_model"],retrieval_build_id=meta["build_id"]))
+            sensitive_ws=req.workspaces if req.sensitive_allowed else []
+            links=self._scope_related(self.repository.related(row["record_id"]),req.workspaces,req.sensitive_allowed,sensitive_ws) if req.include_artifacts else []
+            supersedes=journal.get("supersedes") if self._target_visible(journal.get("supersedes"),req.workspaces,req.sensitive_allowed,sensitive_ws) else None
+            superseded_by=journal.get("superseded_by") if self._target_visible(journal.get("superseded_by"),req.workspaces,req.sensitive_allowed,sensitive_ws) else None
+            title=row["title"]; results.append(SearchResult(record_id=row["record_id"],score=score,rank=n,workspace=row["workspace"],type=row["type"],sensitivity=row["sensitivity"],status=row["status"],valid_at=row["valid_at"],invalid_at=row["invalid_at"],is_current=row["status"]=="accepted" and not row["invalid_at"],title=title,snippet=title[:240],provenance=Provenance(journal_record_id=row["record_id"],source_event_id=event,projection_hash=row["projection_hash"],supersedes=supersedes,superseded_by=superseded_by),artifact_links=links,projection_hash=row["projection_hash"],embedding_model=meta["embedding_model"],retrieval_build_id=meta["build_id"]))
         response=SearchResponse(request_id=req.request_id,retrieval_build_id=meta["build_id"],embedding_model=meta["embedding_model"],mode=req.mode,stale_index=self.health().stale_index,results=results)
         self.audit.write("search",request_id=req.request_id,requested_workspaces=req.workspaces,resolved_workspaces=req.workspaces,types=req.types,mode=req.mode,as_of=req.as_of,limit=req.limit,active_build_id=meta["build_id"],stale_flag=response.stale_index,validation_latency_ms=round(validation_ms,3),embedding_latency_ms=round(embedding_ms,3),retrieval_latency_ms=round((time.perf_counter()-retrieval_started)*1000,3),total_latency_ms=round((time.perf_counter()-started)*1000,3),result_count=len(results),returned_record_ids=[r.record_id for r in results])
         return response
-    def get_record(self,record_id,*,sensitive_allowed=False,allowed_workspaces=None,sensitive_workspaces=None,request_id=None):
+    def get_record(self,record_id,*,allowed_workspaces,sensitive_allowed=False,sensitive_workspaces=(),request_id=None):
         validate_request_id(request_id)
         started=time.perf_counter();request_id=request_id or "uuid4-compat:"+str(uuid.uuid4());row=self.repository.journal_row(record_id)
         if not row or row["status"] in {"candidate","rejected","forgotten"}:
             self.audit.write("get_record",request_id=request_id,error_code="BRAIN_RECORD_NOT_FOUND",returned_record_ids=[]);raise BrainError("BRAIN_RECORD_NOT_FOUND","record is not available",request_id)
-        if allowed_workspaces is not None and row["workspace"] not in set(allowed_workspaces):
+        if not self._workspace_allowed(row["workspace"],allowed_workspaces):
             self.audit.write("get_record",request_id=request_id,error_code="BRAIN_RECORD_NOT_FOUND",returned_record_ids=[]);raise BrainError("BRAIN_RECORD_NOT_FOUND","record is not available",request_id)
-        if row["sensitivity"]=="sensitive" and (not sensitive_allowed or (sensitive_workspaces is not None and row["workspace"] not in set(sensitive_workspaces))):
+        if row["sensitivity"]=="sensitive" and not self._sensitivity_allowed(row["workspace"],row["sensitivity"],allowed_workspaces,sensitive_allowed,sensitive_workspaces):
             self.audit.write("get_record",request_id=request_id,error_code="BRAIN_SENSITIVE_SCOPE_DENIED",returned_record_ids=[]);raise BrainError("BRAIN_SENSITIVE_SCOPE_DENIED","sensitive record requires explicit permission",request_id)
-        result=RecordEnvelope(record_id=record_id,type=row["type"],workspace=row["workspace"],sensitivity=row["sensitivity"],payload=json.loads(row["payload"]),status=row["status"],valid_at=row["valid_at"],invalid_at=row["invalid_at"],supersedes=row["supersedes"],superseded_by=row["superseded_by"])
+        supersedes=row["supersedes"] if self._target_visible(row["supersedes"],allowed_workspaces,sensitive_allowed,sensitive_workspaces) else None
+        superseded_by=row["superseded_by"] if self._target_visible(row["superseded_by"],allowed_workspaces,sensitive_allowed,sensitive_workspaces) else None
+        result=RecordEnvelope(record_id=record_id,type=row["type"],workspace=row["workspace"],sensitivity=row["sensitivity"],payload=json.loads(row["payload"]),status=row["status"],valid_at=row["valid_at"],invalid_at=row["invalid_at"],supersedes=supersedes,superseded_by=superseded_by)
         self.audit.write("get_record",request_id=request_id,resolved_workspaces=[row["workspace"]],result_count=1,returned_record_ids=[record_id],total_latency_ms=round((time.perf_counter()-started)*1000,3));return result
-    def get_related(self,record_id,relation_types=None,request_id=None,*,sensitive_allowed=False,allowed_workspaces=None,sensitive_workspaces=None):
+    def get_related(self,record_id,relation_types=None,request_id=None,*,allowed_workspaces,sensitive_allowed=False,sensitive_workspaces=()):
         validate_request_id(request_id)
-        request_id=request_id or "uuid4-compat:"+str(uuid.uuid4());source=self.get_record(record_id,sensitive_allowed=sensitive_allowed,allowed_workspaces=allowed_workspaces,sensitive_workspaces=sensitive_workspaces,request_id=request_id)
-        if allowed_workspaces is not None and source.workspace not in set(allowed_workspaces):raise BrainError("BRAIN_RECORD_NOT_FOUND","record is not available",request_id)
+        request_id=request_id or "uuid4-compat:"+str(uuid.uuid4())
+        self.get_record(record_id,allowed_workspaces=allowed_workspaces,sensitive_allowed=sensitive_allowed,sensitive_workspaces=sensitive_workspaces,request_id=request_id)
         rows=self.repository.related(record_id)
         if relation_types: rows=[r for r in rows if r["relation"] in relation_types]
-        if allowed_workspaces is not None:rows=self._scope_related(rows,allowed_workspaces,sensitive_allowed,sensitive_workspaces)
+        rows=self._scope_related(rows,allowed_workspaces,sensitive_allowed,sensitive_workspaces)
         result=RelatedResponse(request_id=request_id,record_id=record_id,related=rows)
         self.audit.write("get_related",request_id=request_id,result_count=len(rows),returned_record_ids=[record_id]);return result
-    def _scope_related(self,rows,allowed_workspaces,sensitive_allowed=False,sensitive_workspaces=None):
-        filtered=[];allowed=set(allowed_workspaces);sensitive=set(sensitive_workspaces or [])
+    def _workspace_allowed(self,workspace,allowed_workspaces):
+        return allowed_workspaces is UNRESTRICTED_OPERATOR_SCOPE or workspace in set(allowed_workspaces)
+    def _sensitivity_allowed(self,workspace,sensitivity,allowed_workspaces,sensitive_allowed,sensitive_workspaces):
+        if sensitivity!="sensitive": return True
+        if allowed_workspaces is UNRESTRICTED_OPERATOR_SCOPE: return True
+        return bool(sensitive_allowed) and workspace in set(sensitive_workspaces or ())
+    def _target_visible(self,target_record_id,allowed_workspaces,sensitive_allowed,sensitive_workspaces):
+        if not target_record_id: return False
+        linked=self.repository.journal_row(target_record_id)
+        if not linked or linked["status"] in {"candidate","rejected","forgotten"}: return False
+        if not self._workspace_allowed(linked["workspace"],allowed_workspaces): return False
+        if not self._sensitivity_allowed(linked["workspace"],linked["sensitivity"],allowed_workspaces,sensitive_allowed,sensitive_workspaces): return False
+        return True
+    def _relation_target_id(self,row):
+        # Uniform target extraction for every relation-row shape Repository.related()
+        # produces (Package 5 / B4): supersede rows carry neither a "direction" nor a
+        # record:// artifact_uri, so they must be matched by relation name explicitly --
+        # this is the only place relation *name* drives extraction; the authorization
+        # check that follows (_target_visible) is identical for every shape.
+        if row.get("relation") in ("supersedes","superseded_by"): return row.get("record_id")
+        if row.get("direction")=="incoming": return row.get("record_id")
+        if str(row.get("artifact_uri") or "").startswith("record://"): return row.get("record_id")
+        return None
+    def _scope_related(self,rows,allowed_workspaces,sensitive_allowed=False,sensitive_workspaces=()):
+        filtered=[]
         for row in rows:
-            target=row.get("record_id") if row.get("direction")=="incoming" or str(row.get("artifact_uri","")).startswith("record://") else None
-            if target:
-                linked=self.repository.journal_row(target)
-                if not linked or linked["workspace"] not in allowed:continue
-                if linked["sensitivity"]=="sensitive" and (not sensitive_allowed or linked["workspace"] not in sensitive):continue
+            target=self._relation_target_id(row)
+            if target is not None and not self._target_visible(target,allowed_workspaces,sensitive_allowed,sensitive_workspaces):continue
             filtered.append(row)
         return filtered
     def _meta(self):

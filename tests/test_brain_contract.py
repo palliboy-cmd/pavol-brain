@@ -72,8 +72,8 @@ class BrainContractTests(unittest.TestCase):
   with self.assertRaises(BrainError) as err:self.brain.search(**{**self.request(q),"sensitive_allowed":False})
   self.assertEqual(err.exception.code,"BRAIN_SENSITIVE_SCOPE_DENIED")
  def test_record_related_and_as_of_policy(self):
-  record=self.brain.get_record("rec-001");self.assertEqual(record.record_id,"rec-001")
-  self.assertEqual(self.brain.get_related("rec-001").related[0]["relation"],"touches")
+  record=self.brain.get_record("rec-001",allowed_workspaces=["ai-pos"]);self.assertEqual(record.record_id,"rec-001")
+  self.assertEqual(self.brain.get_related("rec-001",allowed_workspaces=["ai-pos"]).related[0]["relation"],"touches")
   q=REPORT["queries"][0]
   with self.assertRaises(BrainError) as err:self.brain.search(**{**self.request(q),"as_of":"bad"})
   self.assertEqual(err.exception.code,"BRAIN_INVALID_AS_OF")

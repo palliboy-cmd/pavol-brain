@@ -25,9 +25,9 @@ def main():
     if cross: report["cross_workspace"]={"only_requested_workspaces":all(x.workspace in {"ai-pos","ai-pos-app"} for x in cross.results),"returned_workspaces":sorted({x.workspace for x in cross.results})}
     historical=timed(report,"historical_search",lambda:client.search(query="Aké staršie rozhodnutie o Graphiti patrí do histórie?",workspaces=["personal"],types=["decision"],mode="historical",limit=3))
     if historical: report["historical_search"]={"superseded_returned":any(x.status=="superseded" and not x.is_current and x.provenance.superseded_by for x in historical.results)}
-    record=timed(report,"get_record",lambda:client.get_record(current.results[0].record_id)) if current and current.results else None
+    record=timed(report,"get_record",lambda:client.get_record(current.results[0].record_id,allowed_workspaces=["ai-pos"])) if current and current.results else None
     if record: report["get_record"]={"same_record_id":record.record_id==current.results[0].record_id,"canonical_envelope":bool(record.payload),"status":record.status,"authority":"canonical_journal_envelope"}
-    related=timed(report,"get_related",lambda:client.get_related("rec-045"))
+    related=timed(report,"get_related",lambda:client.get_related("rec-045",allowed_workspaces=["personal"]))
     if related: report["get_related"]={"one_hop_explicit_only":bool(related.related) and all(x.get("relation") in {"supersedes","superseded_by","touches","implements","references"} for x in related.related),"count":len(related.related)}
     validation=timed(report,"validation_error",lambda:client.search(query="test",workspaces=["ai-pos"],min_score=.5))
     report["validation_error"]={"pass":validation is None and report["operations"]["validation_error"].get("error")=="BRAIN_FEATURE_NOT_ENABLED","code":report["operations"]["validation_error"].get("error")}
