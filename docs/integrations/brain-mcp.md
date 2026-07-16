@@ -24,3 +24,11 @@ Live status: Hermes 0.18.2 passed a real agent retrieval and preserved record/ev
 A write can only point at another record through the typed `links` field on `brain_record_outcome`/`brain_record_decision` (`{"target_record_id": ..., "relation": "addresses"|"analyzes"|"decides"|"implements"|"results_in"|"caused_by"}`). The server resolves every link at write time — inside the same transaction as the rest of the write — and rejects it if the target does not exist, does not share the source's workspace, or is `rejected`/`forgotten`; a rejected link leaves no row anywhere.
 
 `record://` is **not** an accepted artifact/evidence URI scheme. `evidence`, `artifacts`, `commit`, and `alternatives[].evidence` accept only `repo://`, `git://`, `adr://`, `route://`, `doc://`, and `workspace://` URIs — a `record://` value in any of these fields is rejected as an invalid URI, whether or not the record it names exists. Point at another record with `links`, not with an evidence/artifact URI.
+
+## Idempotency contract
+
+A replayed write with the same explicit `idempotency_key` and the same payload returns the original result with `idempotent: true`. Any divergence under the same stored key is a loud `BRAIN_IDEMPOTENCY_CONFLICT`, never a silent earlier-success return — including for these cases:
+
+- **Legacy rows without a stored `request_hash`.** If the stored `record_created` event for that key predates `request_hash` tracking, replay ends in `BRAIN_IDEMPOTENCY_CONFLICT` (`details.reason="legacy_record_without_request_hash"`), even if the replayed payload is identical to what was originally recorded. The client must mint a new idempotency key to proceed — there is no way to make the same key succeed again.
+- **The system never repairs history in place.** It does not retroactively rewrite the existing record or backfill the missing `request_hash` onto the stored event to make the key work again; the event ledger is append-only.
+- **An explicit idempotency key names one logical write.** Reusing it for a different payload, different metadata (e.g. `supersedes`/`links`/`valid_at`/provenance), a different workspace, or a different record type is treated as an agent bug and fails loud with `BRAIN_IDEMPOTENCY_CONFLICT` rather than silently forking or overwriting.

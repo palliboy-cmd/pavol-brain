@@ -256,13 +256,13 @@ Formalizes what `brain/writer.py` already does, and pins the edge semantics. The
 content_hash     = sha256(canonical({type, workspace, payload}))          # semantic identity
 client_key       = metadata.idempotency_key  OR  content_hash             # explicit or content-derived
 stored_key       = "m1:" + sha256(canonical({instance_id, agent_id, key: client_key}))   # UNIQUE column
-request_hash     = sha256(canonical({instance_id, agent_id, content_hash, sensitivity,
+request_hash     = sha256(canonical({instance_id, agent_id, record_type, workspace, content_hash, sensitivity,
                                      source_assertion, source_excerpt, source_ref, session_ref,
                                      valid_at, supersedes, change_reason, links}))
 ```
 
 - `instance_id`, `agent_id` — server-owned (config/launcher), never client-supplied. `agent_id` is bound to the integration by `RegistryPolicy`'s identity check, so integration identity is covered transitively; no separate integration field is added.
-- `workspace`, `operation type` — inside `content_hash`; a mismatch under the same `stored_key` is a **conflict**, not a fork (see matrix).
+- `record_type`, `workspace` — carried explicitly in `request_hash` (in addition to being covered transitively through `content_hash`), so the stored event is independently auditable without re-deriving `content_hash`; a mismatch under the same `stored_key` is a **conflict**, not a fork (see matrix).
 - `canonical()` = `json.dumps(sort_keys=True, separators=(",",":"), ensure_ascii=False)` over the **post-validation, normalized** pydantic dump — normalized content, not raw input. String contents are not whitespace-normalized (strings are content); field order and defaults are canonicalized.
 
 ### 6.2 Required behavior matrix (normative)
@@ -283,9 +283,9 @@ request_hash     = sha256(canonical({instance_id, agent_id, content_hash, sensit
 
 ### 6.3 Required changes
 
-1. B8 fix in `_existing` (strict conflict when the stored event has no `request_hash`).
-2. Add `record_type` and `workspace` to the `request_hash` input set (self-containedness of the stored event; no behavior change since `content_hash` already covers them — but the stored event becomes independently auditable). This changes hashes only for *future* events; comparison is per-record and never mixes eras, so no migration.
-3. Pinning tests for the two previously untested rows above.
+1. B8 fix in `_existing` (strict conflict when the stored event has no `request_hash`). ✅ implemented in Package 3.
+2. Add `record_type` and `workspace` to the `request_hash` input set (self-containedness of the stored event; no behavior change since `content_hash` already covers them — but the stored event becomes independently auditable). This changes hashes only for *future* events; comparison is per-record and never mixes eras, so no migration. ✅ implemented in Package 3 (`brain/writer.py:120-121`).
+3. Pinning tests for the two previously untested rows above. ✅ implemented in Package 3.
 
 ---
 
