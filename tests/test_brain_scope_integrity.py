@@ -295,8 +295,19 @@ def test_f1_malformed_record_like_uri_dropped_from_get_related_and_search(tmp_pa
     assert uri not in related_payload
     # the malformed row is dropped outright, not merely stripped of its id --
     # only the pre-existing legitimate evidence link (from problem()) remains.
-    assert related.related == [{"relation": "evidence", "artifact_uri": "doc://m1/problem",
-                                 "record_id": personal.record_id}]
+    assert len(related.related) == 1
+    entry = related.related[0]
+    assert entry["relation"] == "evidence"
+    assert entry["artifact_uri"] == "doc://m1/problem"
+    assert entry["record_id"] == personal.record_id
+    # doc:// is not a deterministically verifiable scheme (B9/Package 6):
+    # the trust view fails safe to unverified_reference, never verified.
+    trust = entry["artifact_trust"]
+    assert trust["state"] == "unverified_reference"
+    assert trust["method"] == "not_deterministically_verifiable"
+    assert trust["verifier"] == "server-artifact-validator"
+    assert trust["verified_at"]
+    assert trust["digest"] is None
 
     retrieval = project(journal, tmp_path, name=f"f1-{abs(hash(uri))}.db")
     reader = scoped_reader(journal, retrieval)

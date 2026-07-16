@@ -3,7 +3,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from .errors import BrainError
 from . import instance_identity
-from .record_uri import classify_record_uri, record_target_id, CANONICAL_RECORD_TARGET
+from . import artifact_validation as av
+from .record_uri import classify_record_uri, record_target_id, CANONICAL_RECORD_TARGET, NORMAL_ARTIFACT
 
 class Repository:
     def __init__(self,config): self.config=config
@@ -63,4 +64,26 @@ class Repository:
             if row:
                 for kind,target in (("supersedes",row["supersedes"]),("superseded_by",row["superseded_by"])):
                     if target: out.append({"relation":kind,"record_id":target})
+            self._attach_artifact_trust(con,record_id,out)
             return out
+    def _attach_artifact_trust(self,con,record_id,rows):
+        # B9/Package 6 (§8): every genuine (non record://) artifact link this
+        # record owns gets a read-only trust view, joined from the same
+        # append-only validation events the write path populated. Rows that
+        # name another record (typed links, supersedes/superseded_by,
+        # incoming) are record relations, not artifacts, and never carry this
+        # field. A relation with no matching validation row (or, defensively,
+        # a journal predating the validation tables) fails safe to
+        # unverified_reference rather than being silently omitted as verified.
+        try:
+            states={r["artifact_link_id"]:r for r in con.execute(
+                """SELECT s.artifact_link_id,s.current_state,e.evidence
+                   FROM artifact_validation_state s JOIN artifact_validation_events e ON e.event_id=s.last_event_id
+                   WHERE s.artifact_record_id=?""",(record_id,))}
+        except sqlite3.OperationalError:
+            states={}
+        for item in rows:
+            uri=item.get("artifact_uri")
+            if not uri or classify_record_uri(uri)!=NORMAL_ARTIFACT: continue
+            lid=av.link_id(record_id,item["relation"],uri)
+            item["artifact_trust"]=av.trust_view(states.get(lid))

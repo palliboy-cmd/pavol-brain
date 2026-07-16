@@ -111,7 +111,13 @@ class JournalWriter:
         enforce_band_c({"payload":payload,"client_metadata":metadata}, provenance, request_id)
         validate_evidence_uris(evidence, request_id)
         validate_evidence_uris(artifacts, request_id, "artifacts")
-        artifact_results=verify_all(artifacts,self.config.artifact_repo_roots or {})
+        # B9/Package 6: evidence[] (incl. alternatives[].evidence[]) is verified
+        # through the same server-side verify_all() as artifacts[], so a
+        # verifiable repo://​git:// evidence URI can carry honest metadata
+        # instead of a blanket "derived" origin. classify() below is handed
+        # this same dict but only ever looks up the artifacts+commit keys, so
+        # band classification is unaffected by evidence verification.
+        artifact_results=verify_all(artifacts+evidence,self.config.artifact_repo_roots or {})
         band, status, review, confidence = classify(record_type, payload, metadata["source_assertion"], metadata.get("source_ref"), request_id,artifact_results)
         if metadata.get("supersedes") and not metadata.get("change_reason"):
             raise BrainError("BRAIN_CHANGE_REASON_REQUIRED", "supersede requires change_reason", request_id)
@@ -204,11 +210,26 @@ class JournalWriter:
                 relation_rows.append((record_id, "record://" + link["target_record_id"], link["relation"], confidence, "deterministic", created_at, 1))
             con.executemany("INSERT INTO artifact_links VALUES (?,?,?,?,?,?,?)", relation_rows)
             validation_rows=[]
-            for uri in sorted(set(artifacts)):
-                result=artifact_results[uri];relation="touches"
+            for uri in sorted(set(artifacts + evidence)):
+                result=artifact_results[uri];relation="evidence" if uri in evidence else "touches"
                 lid=av.link_id(record_id,relation,uri);key=f"artifact-validation:m1:{lid}:{result['state']}"
+                # B9/Package 6: the minimum a future verifier needs to re-check or
+                # upgrade a claim without a schema migration, written into the
+                # event's existing `evidence` JSON column. `reason` is populated
+                # only for the unknown/unverifiable state -- verified_active and
+                # verified_inactive are both definite outcomes, not "nobody
+                # looked". Client input never reaches any of these fields.
+                evidence_meta = {
+                    "method": result["method"],
+                    "verifier": "server-artifact-validator",
+                    "verifier_instance": self.config.instance_id,
+                    "verified_at": created_at,
+                    "object_digest": result.get("object_digest"),
+                    "repo_alias": result.get("repo_alias"),
+                    "reason": result["method"] if result["state"] == "unknown" else None,
+                }
                 validation_rows.append((av.event_id_for(key),lid,record_id,uri,relation,created_at,created_at,result["state"],result["reason"],
-                                        "server-artifact-validator",result["method"],canonical({"uri":uri,"method":result["method"]}),None,key,None))
+                                        "server-artifact-validator",result["method"],canonical(evidence_meta),None,key,None))
             if validation_rows:
                 con.executemany("INSERT INTO artifact_validation_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",validation_rows)
                 av.rebuild_state(con)

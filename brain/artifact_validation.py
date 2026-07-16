@@ -14,6 +14,11 @@ from pathlib import Path
 SCHEMA_PATH = Path(__file__).resolve().parents[1] / "spike" / "schema" / "artifact_validation.sql"
 TABLES = ("artifact_validation_events", "artifact_validation_state")
 STATES = ("unknown", "verified_active", "verified_inactive")
+# B9/Package 6: the internal fold state is never surfaced verbatim. `unknown`
+# -- "nobody looked, or the scheme/repo can't be deterministically checked"
+# -- reads to any consumer as `unverified_reference`, so a syntactically
+# valid but unverifiable URI can never be mistaken for a checked one.
+PUBLIC_STATE = {"unknown": "unverified_reference", "verified_active": "verified_active", "verified_inactive": "verified_inactive"}
 REASON_CODES = ("manual_verified", "wrong_target", "malformed_uri", "duplicate", "superseded", "intentionally_retired", "migrated_from_baseline_review", "other")
 CANONICAL_TABLES = ("memory_records", "memory_events", "record_state", "artifact_links")
 
@@ -107,6 +112,31 @@ def canonical_table_digest(con):
         for row in con.execute(f"SELECT * FROM {table} ORDER BY 1,2"):
             digest.update(json.dumps(tuple(row), ensure_ascii=False, default=str).encode())
     return digest.hexdigest()
+
+
+def trust_view(state_row):
+    """Read-only client-facing trust object for one artifact relation.
+
+    ``state_row`` is a ``sqlite3.Row`` (or None) joining
+    ``artifact_validation_state`` to its ``last_event_id`` event, i.e. the
+    columns ``current_state`` and ``evidence`` (that event's verifier
+    metadata JSON, per §8/B9). Fail-safe: no matching validation state --
+    the write path never ran verify_all over this URI, or the row is
+    otherwise unavailable -- presents as `unverified_reference`, never as
+    verified. A client can never influence any field returned here.
+    """
+    if state_row is None:
+        return {"state": "unverified_reference", "method": None, "verifier": None,
+                "verified_at": None, "digest": None, "reason": None}
+    meta = json.loads(state_row["evidence"]) if state_row["evidence"] else {}
+    return {
+        "state": PUBLIC_STATE.get(state_row["current_state"], "unverified_reference"),
+        "method": meta.get("method"),
+        "verifier": meta.get("verifier"),
+        "verified_at": meta.get("verified_at"),
+        "digest": meta.get("object_digest"),
+        "reason": meta.get("reason"),
+    }
 
 
 def journal_relations(con):

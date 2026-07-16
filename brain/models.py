@@ -23,6 +23,20 @@ class SearchRequest(ContractModel):
     min_score: float | None = None
     request_id: str | None = None
 
+ArtifactTrustState = Literal["unverified_reference", "verified_active", "verified_inactive"]
+
+# B9/Package 6 (§8 artifact trust model): read-only, server-owned trust view
+# for one artifact relation. Never a request field -- no request model
+# declares any of these names, and every request model keeps extra="forbid",
+# so a client can neither set nor influence a trust state.
+class ArtifactTrust(ContractModel):
+    state: ArtifactTrustState
+    method: str | None = None
+    verifier: str | None = None
+    verified_at: str | None = None
+    digest: str | None = None
+    reason: str | None = None
+
 class Provenance(ContractModel):
     journal_record_id: str
     source_event_id: str

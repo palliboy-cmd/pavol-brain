@@ -670,3 +670,198 @@ def test_f2_bare_secret_in_artifact_fields_is_secret_rejected_not_uri_echoed(tmp
     assert CANARY.encode() not in journal_bytes and b"sk-live" not in journal_bytes
     audit = audit_bytes(audit_log)
     assert CANARY.encode() not in audit and b"sk-live" not in audit
+
+# ---------------------------------------------------------------------------
+# Package 6 (closes B9, §8 artifact trust model, §10 rows 23-24): a
+# syntactically valid artifact URI is never itself proof; only a server-side
+# verify_all() hit earns verified_active/verified_inactive, everything else
+# (including "nobody looked") reads back as unverified_reference. Evidence
+# URIs now go through the same server verification as artifacts[], but must
+# never change which band a write lands in.
+# ---------------------------------------------------------------------------
+
+def trust_for(related_rows, uri):
+    return next(row for row in related_rows if row.get("artifact_uri") == uri)["artifact_trust"]
+
+def test_repo_artifact_exists_surfaces_verified_active_with_verifier_metadata(tmp_path):
+    b, journal = brain(tmp_path)
+    rec = b.record_outcome(**outcome(idempotency_key="trust-repo-exists"))
+    uri = "repo://pavol-brain/brain/api.py"
+    trust = trust_for(b.get_related(rec.record_id, allowed_workspaces=["personal"]).related, uri)
+    assert trust["state"] == "verified_active"
+    assert trust["method"] == "git_ls_files"
+    assert trust["verifier"] == "server-artifact-validator"
+    assert trust["verified_at"]
+    assert trust["digest"] and len(trust["digest"]) == 40
+    assert trust["reason"] is None
+
+def test_git_commit_artifact_exists_surfaces_verified_active(tmp_path):
+    b, journal = brain(tmp_path)
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    uri = f"git://pavol-brain/commit/{head}"
+    rec = b.record_outcome(**outcome(artifacts=[], commit=uri, idempotency_key="trust-git-exists"))
+    trust = trust_for(b.get_related(rec.record_id, allowed_workspaces=["personal"]).related, uri)
+    assert trust["state"] == "verified_active"
+    assert trust["method"] == "git_cat_file"
+    assert trust["digest"] == head
+
+def test_nonexistent_repo_and_git_artifacts_are_verified_inactive(tmp_path):
+    b, journal = brain(tmp_path)
+    missing_repo = "repo://pavol-brain/does-not-exist"
+    missing_commit = "git://pavol-brain/commit/" + "0" * 40
+    # source_assertion=explicit_user_confirmation so the record lands Band A
+    # (accepted) regardless of artifact validity -- get_record/get_related
+    # refuse candidate rows, and this test is about the trust view, not band
+    # classification (see test_evidence_verification_does_not_change_band_
+    # classification for that).
+    rec = b.record_outcome(**outcome(artifacts=[missing_repo, missing_commit], commit=None,
+                                      source_assertion="explicit_user_confirmation", idempotency_key="trust-missing"))
+    related = b.get_related(rec.record_id, allowed_workspaces=["personal"]).related
+    for uri in (missing_repo, missing_commit):
+        trust = trust_for(related, uri)
+        assert trust["state"] == "verified_inactive"
+        assert trust["digest"] is None
+
+def test_doc_scheme_artifact_is_unverified_reference(tmp_path):
+    b, journal = brain(tmp_path)
+    uri = "doc://synthetic/unverified"
+    rec = b.record_outcome(**outcome(artifacts=[uri], source_assertion="explicit_user_confirmation", idempotency_key="trust-doc"))
+    trust = trust_for(b.get_related(rec.record_id, allowed_workspaces=["personal"]).related, uri)
+    assert trust["state"] == "unverified_reference"
+    assert trust["method"] == "not_deterministically_verifiable"
+    assert trust["reason"] == "not_deterministically_verifiable"
+    assert trust["digest"] is None
+
+def test_unknown_repo_alias_is_unverified_reference_without_path_leak(tmp_path):
+    b, journal = brain(tmp_path)
+    uri = "repo://ghost-repo/some/file.py"
+    rec = b.record_outcome(**outcome(artifacts=[uri], source_assertion="explicit_user_confirmation", idempotency_key="trust-unknown-alias"))
+    related = b.get_related(rec.record_id, allowed_workspaces=["personal"]).related
+    trust = trust_for(related, uri)
+    assert trust["state"] == "unverified_reference"
+    assert trust["method"] == "repo_unavailable"
+    payload = json.dumps(related)
+    assert str(ROOT) not in payload and "/Users/" not in payload
+
+def test_evidence_repo_uri_is_server_verified_not_blanket_derived(tmp_path):
+    b, journal = brain(tmp_path)
+    uri = "repo://pavol-brain/brain/api.py"
+    rec = b.record_problem(statement="evidence gets verified", impact="test", evidence=[uri],
+                            source_assertion="explicit_user_confirmation", workspace="personal",
+                            idempotency_key="trust-evidence-repo")
+    con = sqlite3.connect(journal); con.row_factory = sqlite3.Row
+    origin = con.execute("SELECT origin FROM artifact_links WHERE record_id=? AND artifact_uri=?", (rec.record_id, uri)).fetchone()["origin"]
+    assert origin == "deterministic"
+    event = con.execute("SELECT state,evidence FROM artifact_validation_events WHERE artifact_record_id=? AND artifact_uri=?",
+                         (rec.record_id, uri)).fetchone()
+    assert event["state"] == "verified_active"
+    meta = json.loads(event["evidence"])
+    assert meta["verifier"] == "server-artifact-validator" and meta["object_digest"]
+    trust = trust_for(b.get_related(rec.record_id, allowed_workspaces=["personal"]).related, uri)
+    assert trust["state"] == "verified_active"
+
+def test_evidence_doc_uri_stays_unverified_reference(tmp_path):
+    b, journal = brain(tmp_path)
+    uri = "doc://synthetic/evidence-unverified"
+    rec = b.record_problem(statement="evidence stays unverified", impact="test", evidence=[uri],
+                            source_assertion="explicit_user_confirmation", workspace="personal",
+                            idempotency_key="trust-evidence-doc")
+    trust = trust_for(b.get_related(rec.record_id, allowed_workspaces=["personal"]).related, uri)
+    assert trust["state"] == "unverified_reference"
+
+def test_evidence_verification_does_not_change_band_classification(tmp_path):
+    # §8: evidence verification "can only gain honesty" -- classify() keeps
+    # reading only artifacts+commit, so an identical request differing only
+    # in whether its evidence happens to be server-verifiable must land in
+    # the same band. Covers both a Band A and a Band B source_assertion.
+    b, journal = brain(tmp_path)
+    verifiable = b.record_problem(statement="band regression verifiable", impact="test",
+                                   evidence=["repo://pavol-brain/brain/api.py"],
+                                   source_assertion="explicit_user_confirmation", workspace="personal",
+                                   idempotency_key="band-a-verifiable-evidence")
+    unverifiable = b.record_problem(statement="band regression unverifiable", impact="test",
+                                     evidence=["doc://synthetic/band-a"],
+                                     source_assertion="explicit_user_confirmation", workspace="personal",
+                                     idempotency_key="band-a-unverifiable-evidence")
+    assert (verifiable.policy_band, verifiable.status) == (unverifiable.policy_band, unverifiable.status) == ("A", "accepted")
+
+    verifiable_b = b.record_problem(statement="band b regression verifiable", impact="test",
+                                     evidence=["repo://pavol-brain/brain/api.py"],
+                                     source_assertion="agent_inference", workspace="personal",
+                                     idempotency_key="band-b-verifiable-evidence")
+    unverifiable_b = b.record_problem(statement="band b regression unverifiable", impact="test",
+                                       evidence=["doc://synthetic/band-b"],
+                                       source_assertion="agent_inference", workspace="personal",
+                                       idempotency_key="band-b-unverifiable-evidence")
+    assert (verifiable_b.policy_band, verifiable_b.status) == (unverifiable_b.policy_band, unverifiable_b.status) == ("B", "candidate")
+
+def test_artifacts_only_band_a_gate_unaffected_by_package_6(tmp_path):
+    # Pins the pre-existing §10 acceptance behaviour (test_artifact_validation_
+    # controls_band_a_and_writes_audit_events) still holds byte-for-byte after
+    # evidence verification was added: artifacts[] is still the only input to
+    # classify() for outcome+verified_tool_result.
+    b, journal = brain(tmp_path)
+    valid = b.record_outcome(**outcome(idempotency_key="p6-valid-artifact"))
+    missing = b.record_outcome(**outcome(artifacts=["repo://pavol-brain/does-not-exist"], idempotency_key="p6-missing-artifact"))
+    document = b.record_outcome(**outcome(artifacts=["doc://synthetic/unverified"], idempotency_key="p6-doc-artifact"))
+    assert valid.status == "accepted" and valid.policy_band == "A"
+    assert missing.status == document.status == "candidate"
+    assert missing.policy_band == document.policy_band == "B"
+
+def test_client_cannot_self_assert_trust_fields_on_any_request_model(tmp_path):
+    b, journal = brain(tmp_path)
+    before = row_counts(journal)
+    forbidden = {"verified": True, "verification_state": "verified_active", "artifact_trust": {"state": "verified_active"},
+                 "verifier": "server-artifact-validator", "verified_at": "2026-07-16T00:00:00+00:00", "digest": "deadbeef"}
+    for field, value in forbidden.items():
+        with pytest.raises(BrainError, match="BRAIN_INVALID_REQUEST"):
+            b.record_problem(**problem(idempotency_key=f"self-assert-{field}", **{field: value}))
+    assert row_counts(journal) == before
+
+def test_request_models_reject_trust_fields_at_the_schema_level():
+    from brain.models import OutcomeRequest, DecisionRequest, ProblemRequest, AnalysisRequest
+    from pydantic import ValidationError
+    forbidden = ("verified", "verification_state", "artifact_trust", "verifier", "verified_at", "digest")
+    cases = (
+        (OutcomeRequest, {"workspace": "personal", "summary": "x"}),
+        (DecisionRequest, {"workspace": "personal", "statement": "x", "rationale": "y", "reason": "z"}),
+        (ProblemRequest, {"workspace": "personal", "statement": "x", "impact": "y"}),
+        (AnalysisRequest, {"workspace": "personal", "summary": "x", "findings": ["y"]}),
+    )
+    for model, base in cases:
+        model(**base)  # sanity: the base payload alone is valid
+        for field in forbidden:
+            with pytest.raises(ValidationError):
+                model(**base, **{field: "x"})
+
+def test_related_row_missing_validation_state_fails_safe_to_unverified_reference(tmp_path):
+    # §8: "no client-reachable field can set or influence any validation
+    # state" plus the fail-safe requirement -- an artifact_links row with no
+    # matching artifact_validation_state (never verified by this write, or a
+    # legacy/corrupt row) must present as unverified_reference, never as
+    # verified by omission.
+    b, journal = brain(tmp_path)
+    rec = b.record_problem(statement="orphan link", impact="test", source_assertion="explicit_user_confirmation", workspace="personal")
+    con = sqlite3.connect(journal)
+    con.execute("INSERT INTO artifact_links VALUES (?,?,?,?,?,?,?)",
+                (rec.record_id, "repo://pavol-brain/orphan-link.py", "touches", 1.0, "corrupt-fixture", "2026-07-16T00:00:00+00:00", 1))
+    con.commit(); con.close()
+    trust = trust_for(b.get_related(rec.record_id, allowed_workspaces=["personal"]).related, "repo://pavol-brain/orphan-link.py")
+    assert trust == {"state": "unverified_reference", "method": None, "verifier": None,
+                      "verified_at": None, "digest": None, "reason": None}
+
+def test_search_include_artifacts_carries_the_same_trust_view_as_get_related(tmp_path):
+    b, journal = brain(tmp_path)
+    uri = "repo://pavol-brain/brain/api.py"
+    problem_rec = b.record_problem(statement="search trust parity", impact="test", evidence=[uri],
+                                    source_assertion="explicit_user_confirmation", workspace="personal")
+    retrieval = tmp_path / "retrieval.db"
+    projector = ProjectionProjector(ProjectorConfig(journal, retrieval, "fake", 4, "fake", instance_id="personal"), FakeEmbedder())
+    while projector.run_once(100).status == ProjectionStatus.HEALTHY: pass
+    scoped = Brain(BrainConfig(journal_db_path=journal, retrieval_db_path=retrieval, embedding_dimension=4,
+                                endpoint_probe_timeout=.01, client_identity="reader", instance_id="personal"), NoopTransport())
+    result = scoped.search(query="search trust parity", workspaces=["personal"], types=["problem"], limit=10, include_artifacts=True)
+    row = next(item for item in result.results if item.record_id == problem_rec.record_id)
+    trust = trust_for(row.artifact_links, uri)
+    assert trust["state"] == "verified_active"
+    assert trust["verifier"] == "server-artifact-validator"

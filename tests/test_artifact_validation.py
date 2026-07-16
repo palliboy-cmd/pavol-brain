@@ -1,3 +1,4 @@
+import subprocess
 import sqlite3
 import sys
 import tempfile
@@ -9,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
 from brain import artifact_validation as av
+from brain.artifact_verifier import verify
 from journal_fixture import journal_fixture, add_validation_event
 
 
@@ -93,6 +95,96 @@ class ArtifactValidationModelTests(unittest.TestCase):
         self.assertEqual(len(relations), 14)
         self.assertIn("artifact:rec-048:touches:repo://ai-pos/missing-file.ts", relations)
         self.assertEqual(self.con.execute("SELECT count(*) FROM artifact_links").fetchone()[0], 0)
+
+
+class ArtifactTrustViewTests(unittest.TestCase):
+    """B9/Package 6 (§8): the read-only response-facing trust object.
+
+    ``trust_view`` never has DB access of its own -- it only folds a row
+    (or its absence) into the client-facing shape -- so these are pure unit
+    tests, independent of the write path exercised in test_brain_write.py.
+    """
+
+    def test_missing_validation_state_fails_safe_to_unverified_reference(self):
+        self.assertEqual(av.trust_view(None), {
+            "state": "unverified_reference", "method": None, "verifier": None,
+            "verified_at": None, "digest": None, "reason": None,
+        })
+
+    def test_verified_active_state_surfaces_persisted_verifier_metadata(self):
+        row = {
+            "current_state": "verified_active",
+            "evidence": '{"method":"git_ls_files","verifier":"server-artifact-validator",'
+                        '"verifier_instance":"personal","verified_at":"2026-07-16T00:00:00+00:00",'
+                        '"object_digest":"deadbeef","repo_alias":"pavol-brain","reason":null}',
+        }
+        self.assertEqual(av.trust_view(row), {
+            "state": "verified_active", "method": "git_ls_files", "verifier": "server-artifact-validator",
+            "verified_at": "2026-07-16T00:00:00+00:00", "digest": "deadbeef", "reason": None,
+        })
+
+    def test_unknown_state_surfaces_as_unverified_reference_with_reason(self):
+        row = {
+            "current_state": "unknown",
+            "evidence": '{"method":"not_deterministically_verifiable","verifier":"server-artifact-validator",'
+                        '"verifier_instance":"personal","verified_at":"2026-07-16T00:00:00+00:00",'
+                        '"object_digest":null,"repo_alias":null,"reason":"not_deterministically_verifiable"}',
+        }
+        trust = av.trust_view(row)
+        self.assertEqual(trust["state"], "unverified_reference")
+        self.assertEqual(trust["reason"], "not_deterministically_verifiable")
+        self.assertIsNone(trust["digest"])
+
+    def test_verified_inactive_state_carries_no_unknown_reason(self):
+        row = {
+            "current_state": "verified_inactive",
+            "evidence": '{"method":"git_ls_files","verifier":"server-artifact-validator",'
+                        '"verifier_instance":"personal","verified_at":"2026-07-16T00:00:00+00:00",'
+                        '"object_digest":null,"repo_alias":"pavol-brain","reason":null}',
+        }
+        trust = av.trust_view(row)
+        self.assertEqual(trust["state"], "verified_inactive")
+        self.assertIsNone(trust["reason"])
+
+
+class ArtifactVerifierDigestTests(unittest.TestCase):
+    """B9/Package 6 (§8, §5 digest semantics): a verifiable repo:// or git://
+    target records a cheaply-available stable Git object digest alongside
+    the existence verdict; everything else stays null rather than a guess.
+    Uses this checkout's own repo as the fixture (mirrors test_brain_write.py's
+    ``outcome()`` default, which already relies on the ``pavol-brain`` alias
+    resolving to this repository)."""
+
+    def test_repo_uri_digest_is_cheap_git_blob_sha(self):
+        result = verify("repo://pavol-brain/brain/api.py", {"pavol-brain": str(ROOT)})
+        self.assertEqual(result["state"], "verified_active")
+        self.assertEqual(result["repo_alias"], "pavol-brain")
+        self.assertRegex(result["object_digest"] or "", r"^[0-9a-f]{40}$")
+
+    def test_git_commit_uri_digest_is_the_resolved_commit_sha(self):
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+        result = verify(f"git://pavol-brain/commit/{head}", {"pavol-brain": str(ROOT)})
+        self.assertEqual(result["state"], "verified_active")
+        self.assertEqual(result["object_digest"], head)
+
+    def test_verified_inactive_targets_have_no_digest(self):
+        missing = verify("repo://pavol-brain/does-not-exist", {"pavol-brain": str(ROOT)})
+        self.assertEqual(missing["state"], "verified_inactive")
+        self.assertIsNone(missing["object_digest"])
+
+    def test_unverifiable_scheme_has_no_digest_or_alias(self):
+        result = verify("doc://synthetic/x", {})
+        self.assertEqual(result["state"], "unknown")
+        self.assertEqual(result["method"], "not_deterministically_verifiable")
+        self.assertIsNone(result["object_digest"])
+        self.assertIsNone(result["repo_alias"])
+
+    def test_unknown_repo_alias_records_alias_without_digest(self):
+        result = verify("repo://ghost-repo/some/file.py", {})
+        self.assertEqual(result["state"], "unknown")
+        self.assertEqual(result["method"], "repo_unavailable")
+        self.assertEqual(result["repo_alias"], "ghost-repo")
+        self.assertIsNone(result["object_digest"])
 
 
 if __name__ == "__main__":
