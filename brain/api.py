@@ -9,6 +9,7 @@ from .repository import Repository
 from .audit import AuditLogger
 from .runtime import RuntimeInspector
 from .writer import JournalWriter
+from .write_policy import validate_request_id, looks_like_secret
 
 class HttpEmbeddingTransport:
     def __init__(self,config): self.config=config
@@ -25,6 +26,7 @@ class Brain:
         self.config=config or BrainConfig(); self.repository=repository or Repository(self.config); self.transport=transport or HttpEmbeddingTransport(self.config)
         self.audit=AuditLogger(self.config); self.writer=JournalWriter(self.config)
     def _request(self,**kwargs):
+        validate_request_id(kwargs.get("request_id"))
         # Python stdlib has UUIDv4 but no reliable UUIDv7 in supported runtimes.
         # The prefix makes this compatibility variant explicit in the contract.
         request_id=kwargs.get("request_id") or "uuid4-compat:"+str(uuid.uuid4());kwargs["request_id"]=request_id
@@ -74,6 +76,7 @@ class Brain:
         self.audit.write("search",request_id=req.request_id,requested_workspaces=req.workspaces,resolved_workspaces=req.workspaces,types=req.types,mode=req.mode,as_of=req.as_of,limit=req.limit,active_build_id=meta["build_id"],stale_flag=response.stale_index,validation_latency_ms=round(validation_ms,3),embedding_latency_ms=round(embedding_ms,3),retrieval_latency_ms=round((time.perf_counter()-retrieval_started)*1000,3),total_latency_ms=round((time.perf_counter()-started)*1000,3),result_count=len(results),returned_record_ids=[r.record_id for r in results])
         return response
     def get_record(self,record_id,*,sensitive_allowed=False,allowed_workspaces=None,sensitive_workspaces=None,request_id=None):
+        validate_request_id(request_id)
         started=time.perf_counter();request_id=request_id or "uuid4-compat:"+str(uuid.uuid4());row=self.repository.journal_row(record_id)
         if not row or row["status"] in {"candidate","rejected","forgotten"}:
             self.audit.write("get_record",request_id=request_id,error_code="BRAIN_RECORD_NOT_FOUND",returned_record_ids=[]);raise BrainError("BRAIN_RECORD_NOT_FOUND","record is not available",request_id)
@@ -84,6 +87,7 @@ class Brain:
         result=RecordEnvelope(record_id=record_id,type=row["type"],workspace=row["workspace"],sensitivity=row["sensitivity"],payload=json.loads(row["payload"]),status=row["status"],valid_at=row["valid_at"],invalid_at=row["invalid_at"],supersedes=row["supersedes"],superseded_by=row["superseded_by"])
         self.audit.write("get_record",request_id=request_id,resolved_workspaces=[row["workspace"]],result_count=1,returned_record_ids=[record_id],total_latency_ms=round((time.perf_counter()-started)*1000,3));return result
     def get_related(self,record_id,relation_types=None,request_id=None,*,sensitive_allowed=False,allowed_workspaces=None,sensitive_workspaces=None):
+        validate_request_id(request_id)
         request_id=request_id or "uuid4-compat:"+str(uuid.uuid4());source=self.get_record(record_id,sensitive_allowed=sensitive_allowed,allowed_workspaces=allowed_workspaces,sensitive_workspaces=sensitive_workspaces,request_id=request_id)
         if allowed_workspaces is not None and source.workspace not in set(allowed_workspaces):raise BrainError("BRAIN_RECORD_NOT_FOUND","record is not available",request_id)
         rows=self.repository.related(record_id)
@@ -116,6 +120,7 @@ class Brain:
         result=RebuildStatus(status=status,active_build_id=health.active_build_id,current_build_id=health.active_build_id,last_known_build_metadata=meta,cursor_after=health.retrieval_cursor,last_run_finished=health.last_successful_projector_run,last_successful_validation=health.last_successful_projector_run)
         self.audit.write("rebuild_status",active_build_id=result.active_build_id,result_count=0);return result
     def _record(self,model,record_type,request=None,*,allowed_workspaces=None,request_id=None,**kwargs):
+        validate_request_id(request_id)
         started=time.perf_counter();request_id=request_id or "uuid4-compat:"+str(uuid.uuid4())
         try:
             if isinstance(request,model):value=request
@@ -137,8 +142,14 @@ class Brain:
         except Exception as exc:
             from pydantic import ValidationError
             if isinstance(exc,ValidationError):
-                error=BrainError("BRAIN_INVALID_REQUEST","invalid write request",request_id,{"validation":str(exc)})
-                self.audit.write("record_"+record_type,request_id=request_id,error_code=error.code,instance_id=self.config.instance_id);raise error
+                # B6: pydantic's default rendering of a validation error echoes the
+                # offending raw value (e.g. a rejected verification key), so a
+                # secret-shaped value must never be forwarded into response details.
+                text=str(exc)
+                details={} if looks_like_secret(text) else {"validation":text}
+                error=BrainError("BRAIN_INVALID_REQUEST","invalid write request",request_id,details)
+                self.audit.write("record_"+record_type,request_id=request_id,error_code=error.code,instance_id=self.config.instance_id)
+                raise error from None
             raise
     def record_outcome(self,request=None,**kwargs): return self._record(OutcomeRequest,"outcome",request,**kwargs)
     def record_decision(self,request=None,**kwargs): return self._record(DecisionRequest,"decision",request,**kwargs)

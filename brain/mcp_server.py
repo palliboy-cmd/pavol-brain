@@ -12,6 +12,7 @@ from .config import BrainConfig
 from .errors import BrainError
 from .models import SearchRequest, RecordLink, DecisionAlternative
 from .control import ControlStore, RegistryPolicy
+from .write_policy import validate_request_id
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,7 @@ def create_server(config=None, policy=None, brain=None):
                      request_id: str | None = None) -> dict:
         """Semantic retrieval using the frozen Brain search contract."""
         try:
+            validate_request_id(request_id)
             request_id = request_id or "uuid4-compat:" + str(uuid.uuid4())
             resolved,_=policy.resolve_scope(workspaces,request_id,tool="brain_search")
             request = SearchRequest(query=query, workspaces=resolved, types=types, mode=mode, as_of=as_of,
@@ -87,6 +89,7 @@ def create_server(config=None, policy=None, brain=None):
     def brain_get_record(record_id: str, request_id: str | None = None) -> dict:
         """Return one record envelope when its workspace is granted."""
         try:
+            validate_request_id(request_id)
             scope,p=policy.resolve_scope(None,request_id or "",tool="brain_get_record")
             sensitive=set(getattr(p,"sensitive_workspace_grants",getattr(policy,"sensitive_grants",frozenset())))
             result = brain.get_record(record_id, sensitive_allowed=bool(sensitive),allowed_workspaces=scope,sensitive_workspaces=sensitive,request_id=request_id)
@@ -97,6 +100,7 @@ def create_server(config=None, policy=None, brain=None):
     def brain_get_related(record_id: str, relation_types: list[str] | None = None, request_id: str | None = None) -> dict:
         """Return explicit links for a granted record."""
         try:
+            validate_request_id(request_id)
             scope,p=policy.resolve_scope(None,request_id or "",tool="brain_get_related")
             sensitive=set(getattr(p,"sensitive_workspace_grants",getattr(policy,"sensitive_grants",frozenset())))
             return brain.get_related(record_id, relation_types, request_id,sensitive_allowed=bool(sensitive),allowed_workspaces=scope,sensitive_workspaces=sensitive).model_dump(mode="json")
@@ -128,6 +132,7 @@ def create_server(config=None, policy=None, brain=None):
                              request_id: str | None = None) -> dict:
         """Append a structured task outcome; profile write grant is required."""
         try:
+            validate_request_id(request_id)
             request_id=request_id or "uuid4-compat:"+str(uuid.uuid4())
             scope,p=policy.resolve_scope([workspace] if workspace else None,request_id,tool="brain_record_outcome")
             if len(scope)!=1:raise BrainError("BRAIN_WORKSPACE_REQUIRED","write profile needs one default workspace or an explicit narrowing",request_id)
@@ -154,6 +159,7 @@ def create_server(config=None, policy=None, brain=None):
                               request_id: str | None = None) -> dict:
         """Append a confirmed or candidate decision with alternatives and reopen evidence."""
         try:
+            validate_request_id(request_id)
             request_id=request_id or "uuid4-compat:"+str(uuid.uuid4())
             scope,p=policy.resolve_scope([workspace] if workspace else None,request_id,tool="brain_record_decision")
             if len(scope)!=1:raise BrainError("BRAIN_WORKSPACE_REQUIRED","write profile needs one default workspace or an explicit narrowing",request_id)

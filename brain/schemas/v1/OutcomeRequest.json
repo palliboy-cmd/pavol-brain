@@ -189,8 +189,10 @@
       "title": "Valid At"
     },
     "verification": {
-      "additionalProperties": {
-        "type": "string"
+      "patternProperties": {
+        "^[A-Za-z0-9 _./:-]{1,100}$": {
+          "type": "string"
+        }
       },
       "title": "Verification",
       "type": "object"

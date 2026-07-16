@@ -16,8 +16,19 @@ from brain.errors import BrainError
 from brain.migrations import inspect_m1,migrate_m1
 from brain.projector import ProjectorConfig,ProjectionProjector
 from brain.projector.models import ProjectionStatus
+from brain.write_policy import collect_client_strings
+from brain.write_envelope import FIELD_CLASSIFICATION,REQUEST_MODELS,CLASSIFICATIONS,OUT_OF_BAND_FIELDS
 from journal_fixture import journal_fixture
 from src.journal import fold
+
+# Stable fake canaries matching SECRET_PATTERNS (brain/write_policy.py). CANARY
+# also violates the tight verification-key / request_id charset (it contains
+# "="), so the same value exercises both the shape gates and the Band C
+# content scan. KEY_SAFE_CANARY is alnum/dash only: it passes the
+# verification-key shape gate so a positive result proves Band C's dict-key
+# scan (B6), not the shape constraint, caught it.
+CANARY = "api_key=sk-live-fakeFAKE1234567890fake"
+KEY_SAFE_CANARY = "sk-live-fakeFAKE1234567890fake"
 
 class NoopTransport:
     def embed(self,text):return [1.0,0.0,0.0,0.0]
@@ -33,6 +44,13 @@ def brain(tmp_path,identity="writer",instance="personal"):
                        endpoint_probe_timeout=.01,client_identity=identity,instance_id=instance)
     return Brain(config,NoopTransport()),journal
 
+def brain_with_audit(tmp_path,identity="writer",instance="personal"):
+    journal=tmp_path/"journal.db";journal_fixture(journal,instance_id=instance)
+    audit_log=tmp_path/"audit.jsonl"
+    config=BrainConfig(journal_db_path=journal,retrieval_db_path=tmp_path/"retrieval.db",embedding_dimension=4,
+                       endpoint_probe_timeout=.01,client_identity=identity,instance_id=instance,audit_log_path=audit_log)
+    return Brain(config,NoopTransport()),journal,audit_log
+
 def attached_brain(journal,tmp_path,identity,instance="personal"):
     return Brain(BrainConfig(journal_db_path=journal,retrieval_db_path=tmp_path/f"{identity}.retrieval.db",embedding_dimension=4,
                              endpoint_probe_timeout=.01,client_identity=identity,instance_id=instance),NoopTransport())
@@ -41,6 +59,20 @@ def outcome(**overrides):
     return {"summary":"Implemented M1 write path","changes":["added writer"],"verification":{"tests":"pass"},
             "artifacts":["repo://pavol-brain/brain/api.py"],"source_assertion":"verified_tool_result",
             "workspace":"personal",**overrides}
+
+def decision(**overrides):
+    return {"statement":"Use approach X","rationale":"Because Y","reason":"validated","verdict":"accepted",
+            "evidence":["doc://m1/decision"],"source_assertion":"explicit_user_confirmation","workspace":"personal",**overrides}
+
+def problem(**overrides):
+    return {"statement":"Some problem","impact":"Some impact","evidence":["doc://m1/problem"],
+            "source_assertion":"explicit_user_confirmation","workspace":"personal",**overrides}
+
+def uri_canary(canary=KEY_SAFE_CANARY):
+    return f"doc://artifact/{canary}"
+
+def audit_bytes(audit_log):
+    return audit_log.read_bytes() if audit_log.exists() else b""
 
 def row_counts(journal):
     con=sqlite3.connect(journal)
@@ -419,3 +451,165 @@ def test_representative_migration_preserves_all_canonical_tables_and_projection_
     assert projected("after-migration.db")==hashes_before
     rerun=migrate_m1(journal,backup)
     assert not rerun["changed"] and rerun["message"]=="already migrated"
+
+# --- Package 4: canonical write-envelope filtering (closes B6 + B7) ---
+
+def test_write_envelope_field_classification_lock_in():
+    """§7.1 lock-in: every request-model field is classified, and adding a
+    new field without classifying it here must fail this test."""
+    assert set(REQUEST_MODELS) == set(FIELD_CLASSIFICATION)
+    for name, model in REQUEST_MODELS.items():
+        declared = set(FIELD_CLASSIFICATION[name])
+        actual = set(model.model_fields)
+        assert actual == declared, f"{name}: unclassified or stale fields {actual ^ declared}"
+        assert all(v in CLASSIFICATIONS for v in FIELD_CLASSIFICATION[name].values())
+    assert set(OUT_OF_BAND_FIELDS) == {"request_id"}
+    assert all(v in CLASSIFICATIONS for v in OUT_OF_BAND_FIELDS.values())
+
+def test_collect_client_strings_walks_keys_values_and_nesting():
+    """B6/row 21: the one canonical scanner walk must reach dict keys and
+    values at any depth, including a dict nested inside a list and a dict
+    used as a mapping (its own keys) nested inside a list."""
+    structure = {
+        "marker-key": "marker-value",
+        "list_of_dicts": [{"nested-key": "x"}, "plain-item", ["inner-list-item", {"listed-key": "y"}]],
+    }
+    collected = collect_client_strings(structure)
+    for expected in ("marker-key", "marker-value", "nested-key", "listed-key", "plain-item", "inner-list-item"):
+        assert expected in collected
+
+def test_b6_dict_key_and_nested_secrets_are_rejected_by_band_c():
+    from brain.write_policy import enforce_band_c
+    with pytest.raises(BrainError, match="BRAIN_WRITE_SECRET_REJECTED"):
+        enforce_band_c({"items": [{KEY_SAFE_CANARY: "value"}]}, {}, "test-request")
+    with pytest.raises(BrainError, match="BRAIN_WRITE_SECRET_REJECTED"):
+        enforce_band_c({"items": [{"k": KEY_SAFE_CANARY}]}, {}, "test-request")
+    with pytest.raises(BrainError, match="BRAIN_WRITE_SECRET_REJECTED"):
+        enforce_band_c({KEY_SAFE_CANARY: "value"}, {}, "test-request")
+
+def test_b6_probe_rerun_verification_key_secret_is_shape_safe_is_rejected(tmp_path):
+    """B6 baseline probe re-run: verification={"api_key=sk-live-<canary>": "ok"}
+    used to persist. A key without '=' still passes the new shape gate, so
+    this proves the dict-key Band C scan itself closes the gap."""
+    b,journal=brain(tmp_path)
+    before=row_counts(journal)
+    with pytest.raises(BrainError, match="BRAIN_WRITE_SECRET_REJECTED"):
+        b.record_outcome(**outcome(verification={KEY_SAFE_CANARY: "ok"}, idempotency_key="b6-probe-key-safe"))
+    assert row_counts(journal) == before
+
+def test_b6_probe_rerun_verification_key_with_equals_is_rejected_without_leaking(tmp_path):
+    """The literal B6 baseline probe: verification={"api_key=sk-live-...": "ok"}.
+    The '=' violates the new verification-key shape pattern, so this is
+    rejected at the pydantic layer -- assert the canary never reaches the
+    returned error JSON despite that layer's default value-echoing behavior."""
+    b,journal=brain(tmp_path)
+    before=row_counts(journal)
+    with pytest.raises(BrainError) as exc_info:
+        b.record_outcome(**outcome(verification={CANARY: "ok"}, idempotency_key="b6-probe-key-equals"))
+    err=exc_info.value
+    assert err.code == "BRAIN_INVALID_REQUEST"
+    assert CANARY not in str(err) and "sk-live" not in str(err)
+    assert CANARY not in json.dumps(err.details) and "sk-live" not in json.dumps(err.details)
+    assert row_counts(journal) == before
+
+def test_verification_key_shape_constraint_rejects_malformed_keys(tmp_path):
+    b,journal=brain(tmp_path)
+    valid=b.record_outcome(**outcome(verification={"tests/passed": "yes", "step.1": "ok", "run_id":"a-b:c"},
+                                     idempotency_key="verification-key-valid"))
+    assert valid.status == "accepted"
+    for bad_key in ("", "x"*101, "has a tab\t", "semi;colon", "pipe|char"):
+        with pytest.raises(BrainError, match="BRAIN_INVALID_REQUEST"):
+            b.record_outcome(**outcome(verification={bad_key: "v"}, idempotency_key=f"verification-key-bad-{hash(bad_key)}"))
+
+def test_request_id_shape_contract(tmp_path):
+    b,journal=brain(tmp_path)
+    valid=b.record_outcome(**outcome(idempotency_key="request-id-valid"), request_id="agent-run.7:2026-07-16")
+    assert valid.request_id == "agent-run.7:2026-07-16"
+    before=row_counts(journal)
+    invalid_ids = ("", " ", "id with spaces", "x"*129, "semi;colon", CANARY)
+    for bad in invalid_ids:
+        with pytest.raises(BrainError) as exc_info:
+            b.record_outcome(**outcome(idempotency_key=f"request-id-bad-{hash(bad)}"), request_id=bad)
+        err=exc_info.value
+        assert err.code == "BRAIN_INVALID_REQUEST"
+        assert err.request_id == ""
+        if len(bad) > 1: assert bad not in str(err)
+        assert CANARY not in str(err) and "sk-live" not in str(err)
+    assert row_counts(journal) == before
+
+def test_b7_probe_rerun_request_id_canary_is_rejected_before_any_write(tmp_path):
+    b,journal,audit_log=brain_with_audit(tmp_path)
+    before=row_counts(journal)
+    with pytest.raises(BrainError) as exc_info:
+        b.record_outcome(**outcome(idempotency_key="b7-probe"), request_id=CANARY)
+    err=exc_info.value
+    assert err.code == "BRAIN_INVALID_REQUEST" and err.request_id == ""
+    assert row_counts(journal) == before
+    audit = audit_bytes(audit_log)
+    assert CANARY.encode() not in audit and b"sk-live" not in audit
+
+def test_secret_non_persistence_matrix(tmp_path):
+    """§10 row 20: a client-controlled secret in any persisted write field is
+    rejected, and the canary bytes are absent from the journal file, the
+    audit log, and the returned error."""
+    b,journal,audit_log=brain_with_audit(tmp_path)
+
+    def outcome_case(**overrides):
+        def run():
+            return b.record_outcome(**outcome(**overrides))
+        return run
+
+    def decision_case(**overrides):
+        def run():
+            return b.record_decision(**decision(**overrides))
+        return run
+
+    def problem_case(**overrides):
+        def run():
+            return b.record_problem(**problem(**overrides))
+        return run
+
+    cases = {
+        "summary": outcome_case(summary=CANARY, idempotency_key="secret-summary"),
+        "changes": outcome_case(changes=[CANARY], idempotency_key="secret-changes"),
+        "verification_value": outcome_case(verification={"result": CANARY}, idempotency_key="secret-verification-value"),
+        "verification_key": outcome_case(verification={KEY_SAFE_CANARY: "ok"}, idempotency_key="secret-verification-key"),
+        "open_questions": outcome_case(open_questions=[CANARY], idempotency_key="secret-open-questions"),
+        "statement": decision_case(statement=CANARY, idempotency_key="secret-statement"),
+        "rationale": decision_case(rationale=CANARY, idempotency_key="secret-rationale"),
+        "alternatives_reason": decision_case(alternatives=[{"option":"x","verdict":"rejected","reason":CANARY}],
+                                              idempotency_key="secret-alt-reason"),
+        "alternatives_evidence": decision_case(alternatives=[{"option":"x","verdict":"rejected","reason":"ok",
+                                              "evidence":[uri_canary()]}], idempotency_key="secret-alt-evidence"),
+        "evidence": problem_case(evidence=[uri_canary()], idempotency_key="secret-evidence"),
+        "artifacts": outcome_case(artifacts=[uri_canary()], idempotency_key="secret-artifacts"),
+        "commit": outcome_case(artifacts=[], commit=f"git://repo/commit/{KEY_SAFE_CANARY}", idempotency_key="secret-commit"),
+        "source_excerpt": outcome_case(source_excerpt=CANARY, idempotency_key="secret-source-excerpt"),
+        "source_ref": outcome_case(source_ref=CANARY, idempotency_key="secret-source-ref"),
+        "session_ref": outcome_case(session_ref=CANARY, idempotency_key="secret-session-ref"),
+        "change_reason": outcome_case(supersedes="rec-does-not-exist", change_reason=CANARY, idempotency_key="secret-change-reason"),
+        "idempotency_key": outcome_case(idempotency_key=CANARY),
+    }
+
+    for label, run in cases.items():
+        before = row_counts(journal)
+        with pytest.raises(BrainError) as exc_info:
+            run()
+        err = exc_info.value
+        assert CANARY not in str(err), f"{label}: canary leaked in error str"
+        assert CANARY not in json.dumps(err.details), f"{label}: canary leaked in error details"
+        assert row_counts(journal) == before, f"{label}: rejected write left persistent rows"
+
+    journal_bytes = Path(journal).read_bytes()
+    assert CANARY.encode() not in journal_bytes and b"sk-live" not in journal_bytes
+    audit = audit_bytes(audit_log)
+    assert CANARY.encode() not in audit and b"sk-live" not in audit
+
+    # request_id: handled separately since it is out-of-band (not Band C
+    # scanned), but must still be rejected before any journal/audit write.
+    before = row_counts(journal)
+    with pytest.raises(BrainError) as exc_info:
+        b.record_outcome(**outcome(idempotency_key="secret-request-id"), request_id=CANARY)
+    err = exc_info.value
+    assert err.code == "BRAIN_INVALID_REQUEST" and err.request_id == ""
+    assert row_counts(journal) == before

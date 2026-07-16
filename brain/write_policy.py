@@ -27,13 +27,14 @@ DENY_TEXT_PATTERNS = (
     re.compile(r"(?m)^Traceback \(most recent call last\):"),
 )
 URI_RE = re.compile(r"^(?:repo|git|adr|route|doc|workspace)://[^\s]+$")
+REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 def _entropy(value: str) -> float:
     counts = Counter(value)
     length = len(value)
     return -sum((count / length) * math.log2(count / length) for count in counts.values())
 
-def _looks_like_secret(value: str) -> bool:
+def looks_like_secret(value: str) -> bool:
     if any(pattern.search(value) for pattern in SECRET_PATTERNS):
         return True
     # URI punctuation must not combine an ordinary path plus a commit hash into
@@ -48,19 +49,34 @@ def _looks_like_secret(value: str) -> bool:
             return True
     return False
 
+def collect_client_strings(value, values=None):
+    """The one canonical scanner walk: dict keys and values, list/tuple
+    elements, recursively. B6: a client-controlled string reachable from any
+    persisted field must pass through here, whether it lives as a value or
+    as a dict key at any nesting depth."""
+    if values is None: values = []
+    if isinstance(value, str): values.append(value)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            collect_client_strings(key, values)
+            collect_client_strings(item, values)
+    elif isinstance(value, (list, tuple)):
+        for item in value: collect_client_strings(item, values)
+    return values
+
 def enforce_band_c(payload, provenance, request_id):
-    values = []
-    def collect(value):
-        if isinstance(value, str): values.append(value)
-        elif isinstance(value, dict):
-            for item in value.values(): collect(item)
-        elif isinstance(value, (list, tuple)):
-            for item in value: collect(item)
-    collect(payload); collect(provenance)
-    if any(_looks_like_secret(value) for value in values):
+    values = collect_client_strings(payload); collect_client_strings(provenance, values)
+    if any(looks_like_secret(value) for value in values):
         raise BrainError("BRAIN_WRITE_SECRET_REJECTED", "write rejected by secret filter", request_id)
     if any(pattern.search(value) for value in values for pattern in DENY_TEXT_PATTERNS):
         raise BrainError("BRAIN_WRITE_CONTENT_REJECTED", "transcripts, chain-of-thought, and raw stack traces are not accepted", request_id)
+
+def validate_request_id(request_id):
+    """B7: reject a malformed request_id before any journal work or audit
+    write. The rejection always carries an empty request_id of its own so
+    the invalid client value is never echoed back or logged."""
+    if request_id is not None and not REQUEST_ID_RE.fullmatch(request_id):
+        raise BrainError("BRAIN_INVALID_REQUEST", "request_id has an invalid shape", "")
 
 def validate_evidence_uris(values, request_id, field="evidence"):
     invalid = sorted(value for value in values if not URI_RE.fullmatch(value))

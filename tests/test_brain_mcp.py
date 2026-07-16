@@ -6,9 +6,12 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from brain.api import Brain
 from brain.config import BrainConfig
+from brain.control import ControlStore, IntegrationProfile, READ_TOOLS, RegistryPolicy
 from brain.mcp_server import CapabilityPolicy, create_server
 from brain.models import SearchRequest
 from test_brain_contract import FixtureRepository, FixtureTransport, REPORT
+
+CANARY = "api_key=sk-live-fakeFAKE1234567890fake"
 
 
 def server(allowed=("ai-pos", "personal")):
@@ -56,3 +59,30 @@ def test_record_related_health_and_status():
     assert call(mcp,"brain_get_related",{"record_id":"rec-001"})["related"]
     assert "status" in call(mcp,"brain_health",{})
     assert call(mcp,"brain_rebuild_status",{})["status"] in {"ready","rebuild_required","failed"}
+
+
+def test_b7_probe_rerun_invalid_request_id_rejected_before_policy_denial_audit(tmp_path):
+    """B7 baseline probe re-run: request_id was a free string, unscanned, and
+    written verbatim to the audit log by every operation -- including the
+    RegistryPolicy policy_denial audit event that fires *before* brain.search
+    is ever called. Assert the canary never reaches that audit line."""
+    audit_log = tmp_path / "audit.jsonl"
+    repo = FixtureRepository(); vectors = {q: [1.0 if i == n else 0.0 for n in range(len(repo.keys))] for i, q in enumerate(repo.keys)}
+    fixture_brain = Brain(BrainConfig(embedding_dimension=len(repo.keys), audit_log_path=audit_log, instance_id="legacy"),
+                          FixtureTransport(vectors), repo)
+    store = ControlStore(tmp_path / "control.db")
+    profile = IntegrationProfile("agent-x", "agent-x", "custom_mcp", "local_stdio", "local", True,
+                                  ["ai-pos"], [], list(READ_TOOLS), "agent-x", brain_instance="legacy")
+    store.save(profile, reason="b7 probe fixture")
+    policy = RegistryPolicy(store, "agent-x", fixture_brain.audit, instance_id="legacy", runtime_identity="agent-x")
+    mcp = create_server(policy=policy, brain=fixture_brain)
+
+    # sap-work is not in the profile's allowed_workspaces, so without the fix
+    # this would raise BRAIN_WORKSPACE_DENIED and write a policy_denial audit
+    # line carrying the raw (canary) request_id before brain.search runs.
+    result = call(mcp, "brain_search", {"query": "x", "workspaces": ["sap-work"], "request_id": CANARY})
+    assert result["error"]["code"] == "BRAIN_INVALID_REQUEST"
+    assert result["error"]["request_id"] == ""
+    assert CANARY not in json.dumps(result) and "sk-live" not in json.dumps(result)
+    audit_bytes = audit_log.read_bytes() if audit_log.exists() else b""
+    assert CANARY.encode() not in audit_bytes and b"sk-live" not in audit_bytes

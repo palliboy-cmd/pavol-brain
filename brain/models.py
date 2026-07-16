@@ -1,8 +1,15 @@
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 class ContractModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+# B6: a verification dict key is client-controlled and persisted (payload +
+# raw_input) exactly like a value, so it gets the same shape floor as other
+# short control-adjacent strings. This does not replace the Band C secret
+# scan over keys (brain/write_policy.py::collect_client_strings) -- a
+# key can have a valid shape and still be secret-shaped; both gates apply.
+VerificationKey = Annotated[str, Field(pattern=r"^[A-Za-z0-9 _./:-]{1,100}$")]
 
 class SearchRequest(ContractModel):
     query: str
@@ -105,7 +112,7 @@ class WriteMetadata(ContractModel):
 class OutcomeRequest(WriteMetadata):
     summary: str = Field(min_length=1, max_length=2000)
     changes: list[str] = Field(default_factory=list, max_length=100)
-    verification: dict[str, str] = Field(default_factory=dict)
+    verification: dict[VerificationKey, str] = Field(default_factory=dict)
     open_questions: list[str] = Field(default_factory=list, max_length=100)
     artifacts: list[str] = Field(default_factory=list, max_length=100)
     commit: str | None = None
