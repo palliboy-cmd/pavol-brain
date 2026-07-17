@@ -13,6 +13,15 @@ audit-error behavior). Rows that are only **PARTIAL** say precisely which
 column is unproven and why it was left that way — see "Known limitations"
 at the end. No PARTIAL row was silently upgraded to COVERED.
 
+**Traceability count (verified by direct count, not estimated):** the T#
+mapping tables below (rows 1–28) contain **52 mapping rows** over **35
+distinct T-numbers**, citing **65 distinct test functions**. A mapping row
+is not the same thing as a T-number (several rows share one T-number, e.g.
+T01's 10 rows) or as a test function (several rows cite the same test, e.g.
+`test_second_build_failure_cleans_staging_and_retry_succeeds` under both
+T01 and T02/T05). No natural count of any of these three quantities is 37;
+nothing is missing against §10's 28 rows + sub-rows.
+
 ## How to run this suite
 
 ```
@@ -53,16 +62,20 @@ Closed by **Package 1**: `2ec71d8` (feat, initial), `59f97c4` (fix, recovery/rol
 
 | T# | §10 row | Test module::name | Type | Proves | Status |
 |---|---|---|---|---|---|
-| T01 | 1 — failure injection per bootstrap step | `test_brain_instance_bootstrap.py::test_second_build_failure_cleans_staging_and_retry_succeeds:140` | integration | 2nd `build()` call fails → staging cleaned, no targets, retry succeeds | PARTIAL |
+| T01 | 1 — failure injection per bootstrap step | `test_brain_instance_bootstrap.py::test_snapshot_failure_before_staging_leaves_no_targets_and_retry_succeeds:205` | integration | `snapshot_source` fails → source untouched, no targets, no staging, retry succeeds | PARTIAL |
+| T01 | 1 (cont.) | `::test_first_build_failure_cleans_staging_and_retry_succeeds:222` | integration | 1st `build()` call (personal) fails → staging cleaned, no targets, retry succeeds | PARTIAL |
+| T01 | 1 (cont.) | `::test_second_build_failure_cleans_staging_and_retry_succeeds:140` | integration | 2nd `build()` call (work) fails → staging cleaned, no targets, retry succeeds | PARTIAL |
 | T01 | 1 (cont.) | `::test_count_gate_failure_publishes_nothing:154` | integration | count-mismatch gate → nothing published | PARTIAL |
 | T01 | 1 (cont.) | `::test_integrity_or_fk_gate_failure_publishes_nothing:166` | integration | `av.verify_state` mismatch gate → nothing published | PARTIAL |
 | T01 | 1 (cont.) | `::test_reported_fk_failure_publishes_nothing:174` | integration | reported FK gate → nothing published | PARTIAL |
-| T01 | 1 (cont.) | `::test_second_publish_failure_rolls_back_first_target:186` | integration | 2nd `os.replace` fails → 1st target rolled back | PARTIAL |
+| T01 | 1 (cont.) | `::test_marker_write_failure_leaves_no_marker_and_no_targets_retry_succeeds:241` | integration | marker write fails → no marker, no targets, classifies FRESH, retry succeeds | PARTIAL |
+| T01 | 1 (cont.) | `::test_first_publish_replace_failure_removes_marker_and_staging_retry_succeeds:262` | integration | 1st `os.replace` (personal) fails → marker removed, no targets, no staging, retry succeeds | PARTIAL |
+| T01 | 1 (cont.) | `::test_second_publish_failure_rolls_back_first_target:186` | integration | 2nd `os.replace` (work) fails → 1st target rolled back | PARTIAL |
 | T01 | 1 (cont.) | `::test_crash_after_publish_before_manifest_forward_completes_without_touching_targets:281` | integration | manifest-write failure after both publishes → forward-completion | PARTIAL |
 | T02 | 2 — rollback without partial published state | `::test_second_build_failure_cleans_staging_and_retry_succeeds:140` | integration | neither target exists after injected 2nd-build failure | PARTIAL |
 | T03 | 3 — staging validation gates | `::test_count_gate_failure_publishes_nothing:154`, `::test_integrity_or_fk_gate_failure_publishes_nothing:166`, `::test_reported_fk_failure_publishes_nothing:174` | integration | each gate independently blocks publish | COVERED |
-| T04 | 4 — never exactly one target | *(no dedicated test — see limitations)* | — | — | PARTIAL |
-| T05 | 5 — retry after each failure type | `::test_second_build_failure_cleans_staging_and_retry_succeeds:140` | integration | retry after 2nd-build failure succeeds | PARTIAL |
+| T04 | 4 — never exactly one target | `::test_T04_every_bootstrap_failure_injection_never_leaves_exactly_one_target_unless_recoverable_partial:387` (10 parametrized cases: snapshot, first/second build, count-mismatch gate, FK gate, marker write, first/second `os.replace`, manifest write, and the deliberate `recoverable_partial` exception) | integration | 9 cases assert both targets or neither; the 1 exception (hard crash between the two `os.replace` calls) asserts exactly one target, `recoverable_partial` classification, and — after diverging the survivor with a post-publish write — a fail-closed retry (exit 4) that touches nothing | COVERED |
+| T05 | 5 — retry after each failure type | `::test_snapshot_failure_before_staging_leaves_no_targets_and_retry_succeeds:205`, `::test_first_build_failure_cleans_staging_and_retry_succeeds:222`, `::test_second_build_failure_cleans_staging_and_retry_succeeds:140`, `::test_marker_write_failure_leaves_no_marker_and_no_targets_retry_succeeds:241`, `::test_first_publish_replace_failure_removes_marker_and_staging_retry_succeeds:262` | integration | retry after snapshot/first-build/second-build/marker-write/first-replace failure each completes a clean publish; retry after the count-mismatch/FK gates is not independently exercised (only "nothing published" is asserted for those two) | PARTIAL |
 | T06 | 6 — duplicate bootstrap after success | `::test_rerun_after_success_is_idempotent_noop:271` | integration | rerun after success: `personal`/`work`/`manifest` bytes unchanged, `main()` returns normally | PARTIAL |
 | T07 | 7 — crash after publish, before manifest | `::test_crash_after_publish_before_manifest_forward_completes_without_touching_targets:281` | integration | manifest-write failure after both `os.replace` calls → rerun forward-completes: targets unchanged (⛁), manifest written, marker gone | COVERED |
 | T08 | 8 — post-publish writes survive recovery | `::test_post_publish_write_survives_recovery:301` | integration | row-7 setup + a record appended to `personal` before rerun → record still present, forward-completion, no deletion | COVERED |
@@ -231,7 +244,7 @@ review documents and commit messages as the audit trail):
 
 | Test area | Failure/blocker it reproduced | Closing commit | Review probe (before/after) |
 |---|---|---|---|
-| Bootstrap atomicity/recovery (T01–T09b) | B1 (destructive recovery, no digest verification), B2 (no instance-marker binding) | `2ec71d8`, `59f97c4`, `958f9c3` | No standalone Package 1 review doc found in `docs/reviews/`; changelog in §11 records exit criteria met |
+| Bootstrap atomicity/recovery (T01–T09b) | B1 (destructive recovery, no digest verification), B2 (no instance-marker binding) | `2ec71d8`, `59f97c4`, `958f9c3` | `docs/reviews/package-1-bootstrap-instance-binding-review.md` (verdict `REVISE PACKAGE 1`, executed before/after probes, repair pass at `59f97c4`/`958f9c3`); changelog in §11 records exit criteria met |
 | Referential integrity (T10a–T10b) | B3 (`record://` accepted unresolved into `evidence`/`artifacts`) | `3c60d02` | `test_b3_probe_rerun_record_uri_evidence_is_rejected` explicitly re-runs the pre-fix baseline probe and asserts the old-baseline behavior (accept + persist) no longer occurs |
 | Idempotency (T16–T19) | B8 (missing `request_hash` silently matched divergent metadata) | `82b45e0` | `test_idempotency_legacy_row_without_request_hash_forces_conflict` docstring/assertions directly encode the reproduced B8 scenario and its new conflict outcome |
 | Secret filtering (T20–T22) | B6 (dict keys unscanned), B7 (`request_id` unscanned) | `fcbc2ee`, `9bef695` | `docs/reviews/` Package 4 review; `test_b6_probe_rerun_verification_key_with_equals_is_rejected_without_leaking` and `test_b7_probe_rerun_request_id_canary_is_rejected_before_any_write` are literal probe re-runs; F1/F2/F2b findings and their closure are in the Package 4 §11 changelog entry |
@@ -254,17 +267,32 @@ coverage. None of them represents a confirmed security regression — each
 is a proof-strength gap in the *test*, or (T25) in what the *error
 message* surfaces, not a missing safety mechanism.
 
-1. **T01/T04/T05 — bootstrap failure injection is not exhaustive.** The
-   spec names 6 injection points (snapshot, build×2, marker write, first
-   `os.replace`, second `os.replace`, manifest write); tests exist for the
-   *second* `build`/`os.replace` call, the count/FK/integrity gates, and
-   the manifest write, but not for a `snapshot_source` failure, the
-   *first* `build` call, marker-write itself, or the *first*
-   `os.replace` call. T04 ("never exactly one target") has no standalone
-   aggregate test — it is only implied by the individual "neither target"
-   assertions in T01–T03's covered cases. T05 (retry after *each* failure
-   type) is demonstrated for one failure type (2nd build) but not
-   independently for the count-gate/FK-gate/publish-rollback paths.
+1. **T01/T05 — bootstrap failure-injection exit codes are indirect (closed:
+   injection completeness).** The spec names 6 injection points (snapshot,
+   build×2, marker write, first `os.replace`, second `os.replace`, manifest
+   write); all 6 now have a dedicated test —
+   `test_snapshot_failure_before_staging_leaves_no_targets_and_retry_succeeds`,
+   `test_first_build_failure_cleans_staging_and_retry_succeeds`,
+   `test_second_build_failure_cleans_staging_and_retry_succeeds`,
+   `test_marker_write_failure_leaves_no_marker_and_no_targets_retry_succeeds`,
+   `test_first_publish_replace_failure_removes_marker_and_staging_retry_succeeds`,
+   `test_second_publish_failure_rolls_back_first_target`, and
+   `test_crash_after_publish_before_manifest_forward_completes_without_touching_targets`
+   — each asserting source-byte-identity, no unverified target
+   overwrite/delete, phase-correct staging cleanup, and (except the direct
+   `publish_pair`-level test) a successful clean retry. What remains open is
+   the same gap as limitation #2 below: most of these assert a raised
+   Python exception or `SystemExit`/unchanged-files rather than a real
+   subprocess exit code, so T01 stays PARTIAL for that reason alone. T05
+   (retry after *each* failure type) is now demonstrated independently for
+   snapshot, first-build, second-build, marker-write, and first-`os.replace`
+   failures; retry after the count-gate/FK-gate failures specifically is
+   still not independently exercised (those two tests only assert "nothing
+   published", not a subsequent successful retry), so T05 stays PARTIAL.
+   T04 ("never exactly one target") is now closed by a dedicated aggregate
+   test running all 9 "both-or-neither" scenarios plus the 1 deliberate
+   `recoverable_partial` exception (hard crash between the two `os.replace`
+   calls) — see `test_T04_every_bootstrap_failure_injection_never_leaves_exactly_one_target_unless_recoverable_partial`.
 2. **T02/T06/T07 — exit-code assertions are indirect.** Several bootstrap
    tests call `bootstrap.main()` in-process and assert a raised exception
    or unchanged files, rather than running the script via `subprocess` and
@@ -289,10 +317,19 @@ message* surfaces, not a missing safety mechanism.
    change outside this package's mandate, so it is documented here rather
    than "fixed."
 6. **T15 — no audit-log assertion for the `ControlStore.save` `ValueError`
-   paths**, and no audit check at all for the `authorize()`-time denials
-   (`brain/control.py` has no audit-log call on either path — this is a
-   feature gap in the source, not a test gap; documented, not changed,
-   since Package 8 does not touch `control.py`).
+   path; `authorize()`-time denials are already audited in source but
+   untested.** `RegistryPolicy._deny` (`brain/control.py:160-163`) writes a
+   `policy_denial` audit event with the denial's error code for every
+   `authorize()`-time denial (`BRAIN_WORKSPACE_DENIED`,
+   `BRAIN_SENSITIVE_SCOPE_DENIED`, `BRAIN_INSTANCE_DENIED`, …) whenever an
+   audit logger is wired, and `mcp_server.py:65` wires `brain.audit` —
+   this is implemented, not a source feature gap. The existing unit tests
+   construct `RegistryPolicy` without an audit logger, so no test currently
+   asserts this behavior; that missing assertion is the only real gap.
+   Only `ControlStore.save`'s `ValueError` path (a local-operator action,
+   not an MCP-boundary denial) genuinely has no audit call anywhere in
+   source. Documented, not changed, since Package 8 does not touch
+   `control.py`.
 7. **T17a — no audit-log assertion.** The row's own audit column says
    "conflict audited" but no test checks the audit log content for this
    specific case (T17b/17c/17d don't require it — their audit columns are

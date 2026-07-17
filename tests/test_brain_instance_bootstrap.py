@@ -197,6 +197,235 @@ def test_second_publish_failure_rolls_back_first_target(tmp_path,monkeypatch):
     assert not personal.exists() and not work.exists()
 
 
+# --- Package 8 follow-up: remaining §10 row 1 failure-injection points
+# (snapshot, first build, marker write, first os.replace) + row 4 aggregate
+# ("never exactly one target") -- see
+# docs/reviews/package-8-acceptance-suite-review.md, Known limitation #1.
+
+def test_snapshot_failure_before_staging_leaves_no_targets_and_retry_succeeds(tmp_path,monkeypatch):
+    """§10 row 1 -- the one injection point that runs before any staging file
+    is created; a failure here must leave the source untouched and nothing
+    on disk at either target, and a clean retry must still succeed."""
+    source=tmp_path/"legacy.db";personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    before=source.read_bytes()
+    original=bootstrap.snapshot_source
+    def fail_snapshot(*args,**kwargs):raise RuntimeError("injected snapshot failure")
+    monkeypatch.setattr(bootstrap,"snapshot_source",fail_snapshot);monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(RuntimeError,match="injected snapshot failure"):bootstrap.main()
+    assert source.read_bytes()==before
+    assert not personal.exists() and not work.exists() and not Path(str(personal)+".staging").exists() and not Path(str(work)+".staging").exists()
+    assert not manifest.exists() and not manifest.with_name(manifest.name+".publish-pending").exists()
+    monkeypatch.setattr(bootstrap,"snapshot_source",original);monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main();assert personal.exists() and work.exists()
+
+
+def test_first_build_failure_cleans_staging_and_retry_succeeds(tmp_path,monkeypatch):
+    """§10 row 1 -- the *first* `build()` call (personal) fails, as distinct
+    from the already-covered second (`test_second_build_failure_cleans_staging_and_retry_succeeds`)."""
+    source=tmp_path/"legacy.db";personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    before=source.read_bytes()
+    original=bootstrap.build;calls=0
+    def fail_first(*args,**kwargs):
+        nonlocal calls;calls+=1
+        if calls==1:raise RuntimeError("injected first build failure")
+        return original(*args,**kwargs)
+    monkeypatch.setattr(bootstrap,"build",fail_first);monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(RuntimeError,match="first build"):bootstrap.main()
+    assert source.read_bytes()==before
+    assert not personal.exists() and not work.exists() and not Path(str(personal)+".staging").exists() and not Path(str(work)+".staging").exists()
+    assert not manifest.exists() and not manifest.with_name(manifest.name+".publish-pending").exists()
+    monkeypatch.setattr(bootstrap,"build",original);monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main();assert personal.exists() and work.exists()
+
+
+def test_marker_write_failure_leaves_no_marker_and_no_targets_retry_succeeds(tmp_path,monkeypatch):
+    """§10 row 1 -- the marker write itself (between staging and publish)
+    fails: nothing has been published yet, so the correct recovery
+    classification is FRESH, not a recovery state."""
+    source=tmp_path/"legacy.db";personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    before=source.read_bytes()
+    marker=manifest.with_name(manifest.name+".publish-pending")
+    original=bootstrap.write_json_atomic
+    def fail_on_marker(path,data):
+        if Path(path)==marker:raise RuntimeError("injected marker write failure")
+        return original(path,data)
+    monkeypatch.setattr(bootstrap,"write_json_atomic",fail_on_marker);monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(RuntimeError,match="injected marker write failure"):bootstrap.main()
+    assert source.read_bytes()==before
+    assert not personal.exists() and not work.exists() and not Path(str(personal)+".staging").exists() and not Path(str(work)+".staging").exists()
+    assert not marker.exists() and not manifest.exists()
+    assert bootstrap.classify_recovery(marker,manifest,personal,work)[0]=="fresh"
+    monkeypatch.setattr(bootstrap,"write_json_atomic",original);monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main();assert personal.exists() and work.exists() and json.loads(manifest.read_text())["published"]
+
+
+def test_first_publish_replace_failure_removes_marker_and_staging_retry_succeeds(tmp_path,monkeypatch):
+    """§10 row 1 -- the *first* `os.replace` (personal) fails outright,
+    before either target is published, as distinct from the already-covered
+    second (`test_second_publish_failure_rolls_back_first_target`, which
+    exercises `publish_pair` directly rather than the full `main()` retry
+    path)."""
+    source=tmp_path/"legacy.db";personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    before=source.read_bytes()
+    original_replace=bootstrap.os.replace;calls=0
+    def fail_first(src,dst):
+        nonlocal calls
+        if Path(dst) in (personal,work):
+            calls+=1
+            if calls==1:raise OSError("injected first publish failure")
+        return original_replace(src,dst)
+    monkeypatch.setattr(bootstrap.os,"replace",fail_first);monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(OSError,match="injected first publish failure"):bootstrap.main()
+    assert source.read_bytes()==before
+    assert not personal.exists() and not work.exists() and not Path(str(personal)+".staging").exists() and not Path(str(work)+".staging").exists()
+    assert not manifest.with_name(manifest.name+".publish-pending").exists() and not manifest.exists()
+    monkeypatch.setattr(bootstrap.os,"replace",original_replace);monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    bootstrap.main();assert personal.exists() and work.exists() and json.loads(manifest.read_text())["published"]
+
+
+def _t04_snapshot_failure(monkeypatch,personal,work,manifest):
+    def fail(*a,**k):raise RuntimeError("injected")
+    monkeypatch.setattr(bootstrap,"snapshot_source",fail)
+
+
+def _t04_first_build_failure(monkeypatch,personal,work,manifest):
+    original=bootstrap.build;calls=0
+    def fail(*args,**kwargs):
+        nonlocal calls;calls+=1
+        if calls==1:raise RuntimeError("injected")
+        return original(*args,**kwargs)
+    monkeypatch.setattr(bootstrap,"build",fail)
+
+
+def _t04_second_build_failure(monkeypatch,personal,work,manifest):
+    original=bootstrap.build;calls=0
+    def fail(*args,**kwargs):
+        nonlocal calls;calls+=1
+        if calls==2:raise RuntimeError("injected")
+        return original(*args,**kwargs)
+    monkeypatch.setattr(bootstrap,"build",fail)
+
+
+def _t04_count_mismatch_gate(monkeypatch,personal,work,manifest):
+    original=bootstrap.build;calls=0
+    def fail(*args,**kwargs):
+        nonlocal calls;calls+=1;report=original(*args,**kwargs)
+        if calls==2:report["counts"]["memory_events"]-=1
+        return report
+    monkeypatch.setattr(bootstrap,"build",fail)
+
+
+def _t04_fk_gate_failure(monkeypatch,personal,work,manifest):
+    monkeypatch.setattr(bootstrap.av,"verify_state",lambda con:[{"injected":"mismatch"}])
+
+
+def _t04_marker_write_failure(monkeypatch,personal,work,manifest):
+    marker=manifest.with_name(manifest.name+".publish-pending")
+    original=bootstrap.write_json_atomic
+    def fail(path,data):
+        if Path(path)==marker:raise RuntimeError("injected")
+        return original(path,data)
+    monkeypatch.setattr(bootstrap,"write_json_atomic",fail)
+
+
+def _t04_first_replace_failure(monkeypatch,personal,work,manifest):
+    original=bootstrap.os.replace;calls=0
+    def fail(src,dst):
+        nonlocal calls
+        if Path(dst) in (personal,work):
+            calls+=1
+            if calls==1:raise OSError("injected")
+        return original(src,dst)
+    monkeypatch.setattr(bootstrap.os,"replace",fail)
+
+
+def _t04_second_replace_failure(monkeypatch,personal,work,manifest):
+    original=bootstrap.os.replace;calls=0
+    def fail(src,dst):
+        nonlocal calls
+        if Path(dst) in (personal,work):
+            calls+=1
+            if calls==2:raise OSError("injected")
+        return original(src,dst)
+    monkeypatch.setattr(bootstrap.os,"replace",fail)
+
+
+def _t04_manifest_write_failure(monkeypatch,personal,work,manifest):
+    original=bootstrap.write_json_atomic
+    def fail(path,data):
+        if Path(path)==manifest:raise RuntimeError("injected")
+        return original(path,data)
+    monkeypatch.setattr(bootstrap,"write_json_atomic",fail)
+
+
+def _t04_crash_between_replaces_recoverable_partial(monkeypatch,personal,work,manifest):
+    original=bootstrap.os.replace;calls=0
+    def crash(src,dst):
+        nonlocal calls
+        if Path(dst) in (personal,work):
+            calls+=1
+            if calls==2:raise KeyboardInterrupt("hard crash between the two publishes")
+        return original(src,dst)
+    monkeypatch.setattr(bootstrap.os,"replace",crash)
+
+
+T04_SCENARIOS=[
+    ("snapshot_failure",_t04_snapshot_failure,False),
+    ("first_build_failure",_t04_first_build_failure,False),
+    ("second_build_failure",_t04_second_build_failure,False),
+    ("count_mismatch_gate",_t04_count_mismatch_gate,False),
+    ("fk_gate_failure",_t04_fk_gate_failure,False),
+    ("marker_write_failure",_t04_marker_write_failure,False),
+    ("first_replace_failure",_t04_first_replace_failure,False),
+    ("second_replace_failure",_t04_second_replace_failure,False),
+    ("manifest_write_failure",_t04_manifest_write_failure,False),
+    ("crash_between_replaces_recoverable_partial",_t04_crash_between_replaces_recoverable_partial,True),
+]
+
+
+@pytest.mark.parametrize("name,inject,expect_exactly_one",T04_SCENARIOS,ids=[s[0] for s in T04_SCENARIOS])
+def test_T04_every_bootstrap_failure_injection_never_leaves_exactly_one_target_unless_recoverable_partial(tmp_path,monkeypatch,name,inject,expect_exactly_one):
+    """§10 row 4: after any row 1-3 failure-injection scenario, either both
+    instance journals exist or neither does. The sole deliberate exception is
+    a hard crash landing between the two `publish_pair` `os.replace` calls
+    (simulated with `KeyboardInterrupt`, which bypasses `publish_pair`'s own
+    `except Exception` rollback exactly as an uncatchable process kill
+    would) -- §4.3 classifies that as `recoverable_partial` (exactly one
+    target published). When the survivor has since diverged from what was
+    staged (a legitimate post-publish write, exactly as
+    `test_B1_half_published_target_with_post_publish_write_is_never_clobbered_by_retry`
+    exercises), a retry must refuse and must never touch it -- fail-closed,
+    not silently completed."""
+    source=tmp_path/"legacy.db";journal_fixture(source);exclusion=approved_exclusion(source,tmp_path/"exclusion.json")
+    personal=tmp_path/"personal.db";work=tmp_path/"work.db";manifest=tmp_path/"manifest.json"
+    before=source.read_bytes()
+    inject(monkeypatch,personal,work,manifest)
+    monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+    with pytest.raises(BaseException):
+        bootstrap.main()
+    monkeypatch.undo()
+    assert source.read_bytes()==before
+
+    personal_exists,work_exists=personal.exists(),work.exists()
+    if expect_exactly_one:
+        assert personal_exists and not work_exists,name
+        marker=manifest.with_name(manifest.name+".publish-pending")
+        assert bootstrap.classify_recovery(marker,manifest,personal,work)[0]=="recoverable_partial"
+        con=sqlite3.connect(personal);con.execute("PRAGMA foreign_keys=OFF")
+        con.execute("INSERT INTO memory_records VALUES ('rec-t04-post-publish',2,'problem','personal','normal','{}','{}','deadbeef','idem-t04-post-publish','probe-agent','explicit_user_command',NULL,NULL,NULL,1.0,'2026-07-15T00:00:00+00:00','2026-07-15T00:00:00+00:00')")
+        con.execute("INSERT INTO memory_events VALUES ('evt-t04-post-publish','rec-t04-post-publish','record_created','2026-07-15T00:00:00+00:00','probe-agent','{}')")
+        con.execute("INSERT INTO record_state VALUES ('rec-t04-post-publish','accepted','auto_accepted',NULL,NULL,NULL,NULL,'none',NULL,NULL,'evt-t04-post-publish')")
+        con.commit();con.close()
+        before_bytes=personal.read_bytes()
+        monkeypatch.setattr(sys,"argv",argv(source,personal,work,manifest,exclusion))
+        with pytest.raises(SystemExit) as error:bootstrap.main()
+        assert error.value.code==4
+        assert personal.read_bytes()==before_bytes and not work.exists() and not manifest.exists()
+        assert marker.exists()
+    else:
+        assert (personal_exists and work_exists) or (not personal_exists and not work_exists),name
+
+
 # The two tests previously here (test_retry_recovers_a_crash_marker_and_partial_target,
 # test_retry_keeps_a_completed_pair_if_crash_happened_after_manifest) exercised
 # recover_interrupted_publish(), which deleted whatever sat at a target path
