@@ -9,13 +9,17 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "sqlite-spike" / "scripts")); sys.path.insert(0, str(ROOT / "tests"))
 from brain import artifact_validation as av
 from brain.projector import ProjectorConfig, ProjectionProjector
 from brain.projector.journal_reader import JournalReader, sha256
-from brain.projector.models import ProjectionStatus
+from brain.projector.models import ProjectionStatus, ProjectionReport
 from journal_fixture import journal_fixture, add_validation_event
+
+pytestmark = pytest.mark.acceptance  # §10 rows 25-27 -- see tests/ACCEPTANCE_MATRIX.md
 
 
 class FakeEmbedder:
@@ -398,6 +402,105 @@ class ProjectorTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "removed_record_links_still_present"):
             self.projector._assert_removed(con, "rec-004", doc_id)
 
+    # --- Package 8: consolidation follow-ups (Package 7 review F1/F2/F4) ---
+
+    def test_orphan_fts_row_without_document_requires_rebuild_no_auto_repair(self):
+        self._full()
+        con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+        con.execute("PRAGMA foreign_keys=OFF")
+        doc_id = con.execute("SELECT doc_id FROM retrieval_documents WHERE record_id='rec-004'").fetchone()["doc_id"]
+        con.execute("DELETE FROM retrieval_document_links WHERE record_id='rec-004'")
+        con.execute("DELETE FROM retrieval_embeddings WHERE record_id='rec-004'")
+        con.execute("DELETE FROM retrieval_documents WHERE record_id='rec-004'")
+        con.commit()
+        fts_count_before = con.execute("SELECT count(*) FROM retrieval_fts").fetchone()[0]
+        self.assertIsNotNone(con.execute("SELECT 1 FROM retrieval_fts WHERE rowid=?", (doc_id,)).fetchone())
+        report = self.projector.run_once()
+        self.assertEqual(report.status, ProjectionStatus.REBUILD_REQUIRED)
+        self.assertIn("orphan_fts", report.details["issues"])
+        con2 = sqlite3.connect(self.retrieval)
+        self.assertEqual(con2.execute("SELECT count(*) FROM retrieval_fts").fetchone()[0], fts_count_before)
+        self.assertIsNotNone(con2.execute("SELECT 1 FROM retrieval_fts WHERE rowid=?", (doc_id,)).fetchone())
+
+    def test_orphan_link_row_without_document_requires_rebuild_no_auto_repair(self):
+        self._full()
+        con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+        con.execute("PRAGMA foreign_keys=OFF")
+        doc_id = con.execute("SELECT doc_id FROM retrieval_documents WHERE record_id='rec-004'").fetchone()["doc_id"]
+        con.execute("DELETE FROM retrieval_fts WHERE rowid=?", (doc_id,))
+        con.execute("DELETE FROM retrieval_embeddings WHERE record_id='rec-004'")
+        con.execute("DELETE FROM retrieval_documents WHERE record_id='rec-004'")
+        con.commit()
+        links_count_before = con.execute("SELECT count(*) FROM retrieval_document_links").fetchone()[0]
+        self.assertIsNotNone(con.execute("SELECT 1 FROM retrieval_document_links WHERE record_id='rec-004'").fetchone())
+        report = self.projector.run_once()
+        self.assertEqual(report.status, ProjectionStatus.REBUILD_REQUIRED)
+        self.assertIn("orphan_link", report.details["issues"])
+        con2 = sqlite3.connect(self.retrieval)
+        self.assertEqual(con2.execute("SELECT count(*) FROM retrieval_document_links").fetchone()[0], links_count_before)
+        self.assertIsNotNone(con2.execute("SELECT 1 FROM retrieval_document_links WHERE record_id='rec-004'").fetchone())
+
+    def test_remove_already_absent_branch_catches_leftover_embedding_row(self):
+        self._full()
+        con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+        con.execute("PRAGMA foreign_keys=OFF")
+        con.execute("DELETE FROM retrieval_documents WHERE record_id='rec-004'")
+        con.commit()
+        self.assertIsNotNone(con.execute("SELECT 1 FROM retrieval_embeddings WHERE record_id='rec-004'").fetchone())
+        report = ProjectionReport(ProjectionStatus.HEALTHY)
+        with self.assertRaisesRegex(Exception, "removed_record_embedding_still_present"):
+            self.projector._remove(con, "rec-004", report)
+
+    def test_remove_already_absent_branch_catches_leftover_link_row(self):
+        self._full()
+        con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+        con.execute("PRAGMA foreign_keys=OFF")
+        con.execute("DELETE FROM retrieval_embeddings WHERE record_id='rec-004'")
+        con.execute("DELETE FROM retrieval_documents WHERE record_id='rec-004'")
+        con.commit()
+        self.assertIsNotNone(con.execute("SELECT 1 FROM retrieval_document_links WHERE record_id='rec-004'").fetchone())
+        report = ProjectionReport(ProjectionStatus.HEALTHY)
+        with self.assertRaisesRegex(Exception, "removed_record_links_still_present"):
+            self.projector._remove(con, "rec-004", report)
+
+    def test_remove_already_absent_branch_returns_cleanly_when_truly_clean(self):
+        self._full()
+        con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+        con.execute("PRAGMA foreign_keys=OFF")
+        con.execute("DELETE FROM retrieval_document_links WHERE record_id='rec-004'")
+        con.execute("DELETE FROM retrieval_embeddings WHERE record_id='rec-004'")
+        con.execute("DELETE FROM retrieval_documents WHERE record_id='rec-004'")
+        con.commit()
+        report = ProjectionReport(ProjectionStatus.HEALTHY)
+        self.assertEqual(self.projector._remove(con, "rec-004", report), "already_absent")
+        self.assertEqual(report.noops, 1)
+
+    def test_skip_reason_runtime_guard_rejects_reason_outside_closed_set(self):
+        record = {"status": "accepted", "type": "fact"}  # normally resolves to "not_eligible"
+        import brain.projector.projector as projector_module
+        original = projector_module.CLOSED_SKIP_REASONS
+        projector_module.CLOSED_SKIP_REASONS = frozenset({"status_candidate"})
+        try:
+            with self.assertRaisesRegex(Exception, "skip_reason_not_closed:not_eligible"):
+                self.projector._skip_reason(record)
+        finally:
+            projector_module.CLOSED_SKIP_REASONS = original
+
+    def test_skip_reason_guard_is_not_implemented_via_bare_assert(self):
+        # Package 7 review F2: the closed-enum guard must survive `python -O`,
+        # which strips bare `assert` statements at compile time. Prove the
+        # guard is a real `if ...: raise` by checking the AST for the method
+        # body: no ast.Assert node, and an ast.Raise reachable from an
+        # ast.If (the functional test above proves the guard actually fires;
+        # this proves it can't be optimized away).
+        import ast
+        import inspect
+        import textwrap
+        tree = ast.parse(textwrap.dedent(inspect.getsource(ProjectionProjector._skip_reason)))
+        nodes = list(ast.walk(tree))
+        self.assertFalse(any(isinstance(n, ast.Assert) for n in nodes))
+        self.assertTrue(any(isinstance(n, ast.Raise) for n in nodes))
+
     def test_deterministic_full_rebuild_with_live_written_records(self):
         self._full()
         con = sqlite3.connect(self.journal)
@@ -413,11 +516,25 @@ class ProjectorTests(unittest.TestCase):
         def snapshot():
             con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
             hashes = {r["record_id"]: r["projection_hash"] for r in con.execute("SELECT record_id,projection_hash FROM retrieval_documents")}
-            doc_rows = {(r["record_id"], r["projection_hash"], r["workspace"], r["type"], r["status"], r["is_current"]) for r in con.execute("SELECT record_id,projection_hash,workspace,type,status,is_current FROM retrieval_documents")}
+            # Package 8 (Package 7 review F4): widened beyond the original 6
+            # columns to cover every deterministic document column named in
+            # the spec's rebuild-strengthening requirement, so a projector
+            # bug that reproduces the hash/status/workspace/type/is_current
+            # tuple but drifts on sensitivity/valid_at/confidence/
+            # source_event_id/supersedes/superseded_by would now be caught.
+            doc_rows = {(r["record_id"], r["projection_hash"], r["workspace"], r["type"], r["status"], r["is_current"],
+                         r["sensitivity"], r["valid_at"], r["invalid_at"], r["confidence"], r["source_event_id"],
+                         r["supersedes"], r["superseded_by"])
+                        for r in con.execute("""SELECT record_id,projection_hash,workspace,type,status,is_current,
+                                              sensitivity,valid_at,invalid_at,confidence,source_event_id,supersedes,superseded_by
+                                              FROM retrieval_documents""")}
             emb_rows = {(r["record_id"], r["projection_hash"], r["model_fingerprint"], r["dimensions"]) for r in con.execute("SELECT record_id,projection_hash,model_fingerprint,dimensions FROM retrieval_embeddings")}
             fts_rows = {(r["title"], r["body"], r["artifacts_text"]) for r in con.execute("SELECT title,body,artifacts_text FROM retrieval_fts")}
             link_rows = {(r["record_id"], r["artifact_uri"], r["relation"], r["confidence"], r["origin"], r["verified_at"]) for r in con.execute("SELECT record_id,artifact_uri,relation,confidence,origin,verified_at FROM retrieval_document_links")}
-            return hashes, doc_rows, emb_rows, fts_rows, link_rows
+            cursor_row = con.execute("""SELECT last_source_event_id,projection_schema_version,embedding_model_fingerprint,
+                                      embedding_dimension,projector_version FROM retrieval_projection_cursor WHERE singleton=1""").fetchone()
+            cursor_final = dict(cursor_row)
+            return hashes, doc_rows, emb_rows, fts_rows, link_rows, cursor_final
 
         before = snapshot()
         self.assertIn("rec-p7-live", before[0])

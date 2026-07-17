@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
@@ -13,6 +15,8 @@ sys.path.insert(0, str(ROOT / "tests"))
 from brain import artifact_validation as av
 from brain.artifact_verifier import verify
 from journal_fixture import journal_fixture, add_validation_event
+
+pytestmark = pytest.mark.acceptance  # §10 row 23 -- see tests/ACCEPTANCE_MATRIX.md
 
 
 class ArtifactValidationModelTests(unittest.TestCase):
@@ -67,6 +71,16 @@ class ArtifactValidationModelTests(unittest.TestCase):
         mismatches = av.verify_state(self.con)
         self.assertEqual(len(mismatches), 1)
         self.assertEqual(mismatches[0]["artifact_link_id"], "artifact:rec-004:touches:repo://ai-pos/README.md")
+        # §10 row 23b "rebuild_state repairs": the fold is a pure function of
+        # the append-only events, so rebuilding from the same events restores
+        # the correct state and verify_state reports no further mismatch.
+        av.rebuild_state(self.con)
+        self.assertEqual(av.verify_state(self.con), [])
+        repaired = self.con.execute(
+            "SELECT current_state FROM artifact_validation_state WHERE artifact_link_id=?",
+            ("artifact:rec-004:touches:repo://ai-pos/README.md",),
+        ).fetchone()[0]
+        self.assertEqual(repaired, "verified_active")
 
     def test_fold_effective_time_semantics(self):
         av.apply_migration(self.con)

@@ -23,6 +23,14 @@ def validate(con, journal_head, config):
         "document_without_embedding": "SELECT count(*) FROM retrieval_documents d LEFT JOIN retrieval_embeddings e USING(record_id) WHERE e.record_id IS NULL",
         "forbidden_document": "SELECT count(*) FROM retrieval_documents WHERE status IN ('candidate','rejected','forgotten')",
         "hash_mismatch": "SELECT count(*) FROM retrieval_documents d JOIN retrieval_embeddings e USING(record_id) WHERE d.projection_hash != e.projection_hash",
+        # Package 7 review F1: a document row can be deleted (e.g. by the
+        # already_absent no-op path, or by out-of-band/FK-off corruption)
+        # while its FTS row or link rows survive. Neither leaks through
+        # search (both join to retrieval_documents), but both are silent
+        # data debris that _assert_removed cannot always see (no doc_id is
+        # known once the document row is already gone), so catch them here.
+        "orphan_fts": "SELECT count(*) FROM retrieval_fts f LEFT JOIN retrieval_documents d ON d.doc_id = f.rowid WHERE d.doc_id IS NULL",
+        "orphan_link": "SELECT count(*) FROM retrieval_document_links l LEFT JOIN retrieval_documents d USING(record_id) WHERE d.record_id IS NULL",
     }
     for name, query in checks.items():
         if con.execute(query).fetchone()[0]: issues.append(name)

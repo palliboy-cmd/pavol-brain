@@ -22,6 +22,8 @@ from brain.write_envelope import FIELD_CLASSIFICATION,REQUEST_MODELS,CLASSIFICAT
 from journal_fixture import journal_fixture
 from src.journal import fold
 
+pytestmark = pytest.mark.acceptance  # §10 rows 10a-10b, 16-24 -- see tests/ACCEPTANCE_MATRIX.md
+
 # Stable fake canaries matching SECRET_PATTERNS (brain/write_policy.py). CANARY
 # also violates the tight verification-key / request_id charset (it contains
 # "="), so the same value exercises both the shape gates and the Band C
@@ -322,7 +324,7 @@ def test_search_filters_corrupt_cross_workspace_related_record_ids(tmp_path):
     assert not any(link.get("record_id")==foreign.record_id for link in row.artifact_links)
 
 def test_record_uri_is_rejected_in_evidence_artifacts_commit_and_alternatives_evidence(tmp_path):
-    b, journal = brain(tmp_path)
+    b, journal, audit_log = brain_with_audit(tmp_path)
     same_ws = b.record_problem(statement="Existing same-workspace record", impact="test",
                                 source_assertion="explicit_user_confirmation", workspace="personal")
     foreign_ws = b.record_problem(statement="Existing foreign-workspace record", impact="test",
@@ -368,11 +370,19 @@ def test_record_uri_is_rejected_in_evidence_artifacts_commit_and_alternatives_ev
         con.close()
         assert after == before, f"partial write leaked for case={case}"
 
+    # §10 row 10b "error audited": every one of the 4 fields x 3 cases above
+    # raised BRAIN_INVALID_ARTIFACT_URI, and the writer's own _record()
+    # error path (brain/api.py) audits every raised BrainError -- confirm
+    # that actually happened, in the audit log's own bytes, the required
+    # number of times (not just that the exception was raised in-process).
+    audit_text = audit_bytes(audit_log).decode()
+    assert audit_text.count('"error_code": "BRAIN_INVALID_ARTIFACT_URI"') == 4 * len(targets)
+
 def test_record_scheme_removed_from_uri_policy_does_not_affect_typed_links(tmp_path):
     from brain.write_policy import URI_RE
     assert not URI_RE.fullmatch("record://rec_anything")
     assert URI_RE.fullmatch("doc://x") and URI_RE.fullmatch("repo://x") and URI_RE.fullmatch("git://x")
-    b, journal = brain(tmp_path)
+    b, journal, audit_log = brain_with_audit(tmp_path)
     problem = b.record_problem(statement="Agents lose context", impact="Repeated explanation",
                                 evidence=["doc://m1/problem"], source_assertion="explicit_user_confirmation",
                                 workspace="personal")
@@ -393,10 +403,23 @@ def test_record_scheme_removed_from_uri_policy_does_not_affect_typed_links(tmp_p
                            source_assertion="explicit_user_confirmation", workspace="personal")
     foreign = b.record_problem(statement="Foreign target", impact="test",
                                 source_assertion="explicit_user_confirmation", workspace="ai-pos")
+    # §10 row 10a: cross-instance/workspace direct link -- "no rows" and
+    # "error audited" as well as the error code itself.
+    con = sqlite3.connect(journal)
+    before = tuple(con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
+                    for t in ("memory_records", "memory_events", "record_state", "artifact_links"))
+    con.close()
     with pytest.raises(BrainError, match="BRAIN_CROSS_WORKSPACE_LINK_DENIED"):
         b.record_decision(statement="Cross-workspace link", rationale="test", verdict="accepted", reason="test",
                            links=[{"target_record_id": foreign.record_id, "relation": "addresses"}],
-                           source_assertion="explicit_user_confirmation", workspace="personal")
+                           source_assertion="explicit_user_confirmation", workspace="personal",
+                           idempotency_key="row-10a-cross-workspace-link")
+    con = sqlite3.connect(journal)
+    after = tuple(con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
+                   for t in ("memory_records", "memory_events", "record_state", "artifact_links"))
+    con.close()
+    assert after == before
+    assert '"error_code": "BRAIN_CROSS_WORKSPACE_LINK_DENIED"' in audit_bytes(audit_log).decode()
 
 def test_b3_probe_rerun_record_uri_evidence_is_rejected(tmp_path):
     """Appendix A probe 1 re-run: baseline (pre-Package-2) accepted both of
@@ -597,6 +620,14 @@ def test_secret_non_persistence_matrix(tmp_path):
         with pytest.raises(BrainError) as exc_info:
             run()
         err = exc_info.value
+        # §10 row 20 "Expected result": BRAIN_WRITE_SECRET_REJECTED for every
+        # position -- Band C's whole-envelope scan (write_policy.py) runs
+        # before any field-specific validation, so a canary wrapped in an
+        # otherwise-valid URI is still caught as a secret, not echoed back
+        # as an invalid-URI value (see test_f2_bare_secret_in_artifact_
+        # fields_is_secret_rejected_not_uri_echoed for the bare, non-URI
+        # secret case this generalizes).
+        assert err.code == "BRAIN_WRITE_SECRET_REJECTED", f"{label}: got {err.code} (details={err.details})"
         assert CANARY not in str(err), f"{label}: canary leaked in error str"
         assert CANARY not in json.dumps(err.details), f"{label}: canary leaked in error details"
         assert row_counts(journal) == before, f"{label}: rejected write left persistent rows"

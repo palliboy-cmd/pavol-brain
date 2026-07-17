@@ -9,6 +9,8 @@ from brain import instance_identity
 
 ROOT=Path(__file__).parents[1]
 
+pytestmark = pytest.mark.acceptance  # §10 row 15 (denial part), 28 -- see tests/ACCEPTANCE_MATRIX.md
+
 def profile(i="agent",enabled=False,ws=None,sensitive=None,tools=None):
  return IntegrationProfile(i,i,"custom_mcp","ssh_stdio","mini-core",enabled,ws or ["personal"],sensitive or [],tools or list(READ_TOOLS),i)
 
@@ -43,8 +45,12 @@ def test_write_grant_requires_an_existing_marked_journal(tmp_path,monkeypatch):
  monkeypatch.setenv("BRAIN_PERSONAL_JOURNAL_DB",str(tmp_path/"missing-personal.db"))
  p=profile("writer",True,tools=list(TOOLS));p.write_enabled=True;p.brain_instance="personal"
  with pytest.raises(ValueError,match="requires an existing, marker-stamped journal"):s.save(p)
+ # §10 row 28 "no profile persisted": the raise happens before ControlStore's
+ # write block, so no row for this integration_id exists afterward.
+ assert s.get(p.integration_id) is None
  stamped_journal(tmp_path/"missing-personal.db","work")
  with pytest.raises(ValueError,match="is marked for instance 'work'"):s.save(p)
+ assert s.get(p.integration_id) is None
 
 def test_write_grant_defaults_off_and_instance_is_bound(tmp_path,monkeypatch):
  s=ControlStore(tmp_path/"control.db");s.save(profile(enabled=True))

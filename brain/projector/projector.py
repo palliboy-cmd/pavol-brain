@@ -106,7 +106,15 @@ class ProjectionProjector:
 
     def _remove(self, con, record_id, report):
         row = con.execute("SELECT doc_id FROM retrieval_documents WHERE record_id=?", (record_id,)).fetchone()
-        if not row: report.noops += 1; return "already_absent"
+        if not row:
+            report.noops += 1
+            # The document row is already gone, so its former doc_id (and
+            # therefore any FTS row keyed on it) is not recoverable here;
+            # validate()'s orphan_fts check catches that case on the next
+            # run. Embedding and link rows are keyed by record_id, so they
+            # are still directly verifiable on this path.
+            self._assert_removed(con, record_id, None)
+            return "already_absent"
         doc_id = row["doc_id"]
         report.links_removed += con.execute("SELECT count(*) FROM retrieval_document_links WHERE record_id=?", (record_id,)).fetchone()[0]
         self._delete_embedding(con, record_id)
@@ -123,7 +131,7 @@ class ProjectionProjector:
             raise ProjectorError("removed_record_document_still_present")
         if con.execute("SELECT 1 FROM retrieval_embeddings WHERE record_id=?", (record_id,)).fetchone():
             raise ProjectorError("removed_record_embedding_still_present")
-        if con.execute("SELECT 1 FROM retrieval_fts WHERE rowid=?", (doc_id,)).fetchone():
+        if doc_id is not None and con.execute("SELECT 1 FROM retrieval_fts WHERE rowid=?", (doc_id,)).fetchone():
             raise ProjectorError("removed_record_fts_row_still_present")
         if con.execute("SELECT 1 FROM retrieval_document_links WHERE record_id=?", (record_id,)).fetchone():
             raise ProjectorError("removed_record_links_still_present")
@@ -190,7 +198,10 @@ class ProjectionProjector:
             reason = "artifact_no_verified_active_relations"
         else:
             reason = "not_eligible"
-        assert reason in CLOSED_SKIP_REASONS, reason
+        if reason not in CLOSED_SKIP_REASONS:
+            # Deliberately not `assert`: this guard must hold under `python -O`,
+            # where assert statements are stripped.
+            raise ProjectorError(f"skip_reason_not_closed:{reason}")
         return reason
 
     def run_once(self, batch_size=100):

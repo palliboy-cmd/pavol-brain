@@ -12,6 +12,8 @@ from journal_fixture import journal_fixture
 from brain.errors import BrainError
 from brain import instance_identity
 
+pytestmark = pytest.mark.acceptance  # §10 rows 1-9b, 15 (save-gate part), 28 -- see tests/ACCEPTANCE_MATRIX.md
+
 ROOT=Path(__file__).parents[1]
 SPEC=importlib.util.spec_from_file_location("bootstrap_brain_instances",ROOT/"scripts/bootstrap_brain_instances.py")
 bootstrap=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(bootstrap)
@@ -383,16 +385,20 @@ def test_journal_writer_refuses_on_instance_mismatch(tmp_path):
     from brain.writer import JournalWriter
     from brain.config import BrainConfig
     journal=tmp_path/"work.db";journal_fixture(journal,instance_id="work")
+    before=journal.read_bytes()
     writer=JournalWriter(BrainConfig(journal_db_path=journal,instance_id="personal"))
     with pytest.raises(BrainError,match="BRAIN_INSTANCE_MISMATCH"):writer.connect()
+    assert journal.read_bytes()==before  # §10 row 9: refusal before any query, journal byte-identical
 
 
 def test_journal_writer_refuses_on_missing_marker(tmp_path):
     from brain.writer import JournalWriter
     from brain.config import BrainConfig
     journal=tmp_path/"unmarked.db";journal_fixture(journal)  # no instance_id -> no marker
+    before=journal.read_bytes()
     writer=JournalWriter(BrainConfig(journal_db_path=journal,instance_id="personal"))
     with pytest.raises(BrainError,match="BRAIN_INSTANCE_MARKER_MISSING"):writer.connect()
+    assert journal.read_bytes()==before  # §10 row 9b: refusal before any query, journal byte-identical
 
 
 def test_journal_writer_accepts_matching_instance(tmp_path):
@@ -407,9 +413,11 @@ def test_repository_journal_and_retrieval_refuse_on_instance_mismatch(tmp_path):
     from brain.repository import Repository
     from brain.config import BrainConfig
     journal=tmp_path/"work.db";journal_fixture(journal,instance_id="work")
+    before=journal.read_bytes()
     repo=Repository(BrainConfig(journal_db_path=journal,retrieval_db_path=tmp_path/"missing-retrieval.db",instance_id="personal"))
     with pytest.raises(BrainError,match="BRAIN_INSTANCE_MISMATCH"):
         with repo.journal():pass
+    assert journal.read_bytes()==before
 
 
 def test_repository_retrieval_refuses_on_instance_mismatch(tmp_path):
@@ -422,17 +430,21 @@ def test_repository_retrieval_refuses_on_instance_mismatch(tmp_path):
         def embed_document(self,text):return [1.0,0.0,0.0,0.0],"fake"
     projector=ProjectionProjector(ProjectorConfig(journal,retrieval,"fake",4,"fake",instance_id="personal"),FakeEmbedder())
     while projector.run_once(100).status.value=="HEALTHY":pass
+    before=retrieval.read_bytes()
     repo=Repository(BrainConfig(journal_db_path=journal,retrieval_db_path=retrieval,instance_id="work"))
     with pytest.raises(BrainError,match="BRAIN_INSTANCE_MISMATCH"):
         with repo.retrieval():pass
+    assert retrieval.read_bytes()==before
 
 
 def test_projector_journal_reader_refuses_on_instance_mismatch(tmp_path):
     from brain.projector.journal_reader import JournalReader
     journal=tmp_path/"work.db";journal_fixture(journal,instance_id="work")
+    before=journal.read_bytes()
     reader=JournalReader(journal,instance_id="personal")
     with pytest.raises(BrainError,match="BRAIN_INSTANCE_MISMATCH"):
         with reader.connect():pass
+    assert journal.read_bytes()==before
 
 
 def test_projector_stamps_retrieval_marker_on_first_write_and_enforces_it_thereafter(tmp_path):

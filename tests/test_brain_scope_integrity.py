@@ -35,6 +35,8 @@ from brain.record_uri import classify_record_uri, record_target_id, CANONICAL_RE
 
 from test_brain_write import brain, problem, NoopTransport, FakeEmbedder
 
+pytestmark = pytest.mark.acceptance  # §10 rows 11-14 -- see tests/ACCEPTANCE_MATRIX.md
+
 CORRUPT_AT = "2026-07-13T00:00:00+00:00"
 
 
@@ -172,6 +174,22 @@ def test_b4_probe_corrupt_superseded_by_excluded_and_nulled(tmp_path):
     assert not any(row.get("record_id") == foreign.record_id for row in related.related)
     record = b.get_record(personal.record_id, allowed_workspaces=["personal"])
     assert record.superseded_by is None
+
+
+def test_b4_probe_corrupt_superseded_by_nulled_in_search_provenance(tmp_path):
+    # §10 row 12: the search path specifically, not just get_related/get_record
+    # (the sibling supersedes case is covered end-to-end via search in
+    # test_b4_probe_include_artifacts_and_provenance_sanitized_in_search).
+    b, journal, personal, foreign, sensitive = seeded(tmp_path)
+    corrupt_superseded_by(journal, personal.record_id, foreign.record_id)
+    retrieval = project(journal, tmp_path)
+    reader = scoped_reader(journal, retrieval)
+    result = reader.search(query="Scoped source", workspaces=["personal"], types=["problem"], limit=10,
+                            sensitive_allowed=True)
+    row = next(item for item in result.results if item.record_id == personal.record_id)
+    assert row.provenance.superseded_by is None
+    payload = json.dumps(result.model_dump(mode="json"))
+    assert foreign.record_id not in payload
 
 
 def test_b4_probe_include_artifacts_and_provenance_sanitized_in_search(tmp_path):

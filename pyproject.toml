@@ -6,3 +6,8 @@ dependencies = ["pydantic>=2.7,<3", "mcp>=1.27,<2"]
 
 [dependency-groups]
 dev = ["pytest>=8,<10"]
+
+[tool.pytest.ini_options]
+markers = [
+    "acceptance: adversarial acceptance-matrix tests mapped to docs/architecture/write-safety-integrity-repair-spec.md §10 -- see tests/ACCEPTANCE_MATRIX.md",
+]
