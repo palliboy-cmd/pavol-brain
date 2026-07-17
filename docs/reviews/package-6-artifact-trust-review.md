@@ -281,3 +281,60 @@ Repair landed 2026-07-17 on top of `2700ba9`, scoped to exactly F1 and F2 (no Pa
 
 - **Git status:** clean working tree; branch is `main` at `2700ba9` (one commit ahead of `origin/main`, pre-existing).
 - **No commit or push was created by this review.** Only this report file was added under `docs/reviews/`.
+
+## Delta re-review (2700ba9..fa2e3b8) — 2026-07-17
+
+Independent re-review of the repair delta only (`fa2e3b8` — *fix(brain): harden
+artifact verifier argument isolation*). Unchanged Package 6 code was not
+re-reviewed. All probes were re-executed independently of the shipped tests
+(fresh probe script, temporary journals, throwaway/local checkout git repos;
+no live journal or retrieval DB touched).
+
+**Verdict: APPROVED FOR PACKAGE 7.**
+
+- **F1 — CLOSED, independently confirmed.** `repo://alias/-v`, `repo://alias/--`,
+  `repo://alias/--error-unmatch`, `git://alias/-v`, `git://alias/--help` — plus
+  extra payloads not in the shipped tests (`-`, `-c core.editor=…`, `--batch`,
+  `--textconv`, `-p`, NUL bytes, `..`, absolute and traversal paths) — all
+  return `verified_inactive`/non-verified with `valid=False` and `object_digest=null`;
+  none reach `verified_active` or Band A. All three `subprocess.run` calls in
+  `brain/artifact_verifier.py` (the only ones in the module) use argument
+  lists, never `shell=True`, pre-reject option-shaped/escaping tokens before
+  any subprocess runs, and carry the correct terminator per command: `--` for
+  `ls-files` and `cat-file -e`, `--end-of-options` for `rev-parse --verify`
+  (confirmed empirically that a bare `--` there fails even a valid `HEAD`,
+  rc=1, so `--end-of-options` is the right form; also confirmed `cat-file -e --`
+  still accepts a valid `HEAD^{commit}`, rc=0).
+- **End-to-end Band A probe — re-run, fix holds.**
+  `record_outcome(artifacts=["repo://pavol-brain/-v"], source_assertion="verified_tool_result")`
+  against a temporary journal → `policy_band="B"`, `status="candidate"`,
+  `review="pending"`; validation event `state="verified_inactive"`
+  (`reason_code="malformed_uri"`, confirmed in the column), `object_digest=null`,
+  no filesystem path or subprocess output in the persisted evidence JSON.
+  `get_related` on the candidate record refuses with `BRAIN_RECORD_NOT_FOUND`
+  — strictly safer than surfacing any trust state.
+- **Valid-path regressions — no regressions.** Tracked `repo://` file →
+  `verified_active` with 40-hex blob digest; valid `git://` commit (real HEAD
+  SHA) → `verified_active` with matching commit digest; missing file and
+  all-zeros SHA → `verified_inactive`, `digest=null`.
+- **F2 — CLOSED, independently confirmed.** `trust_view` on malformed JSON,
+  JSON list/scalar/bool/`null`, and a missing `evidence` key never raises and
+  never echoes the raw value; a row whose own `current_state` says
+  `verified_active` with malformed evidence folds to `unverified_reference`
+  (`reason="malformed_validation_metadata"`). Missing-row and empty-evidence
+  behavior unchanged.
+- **Tests:** repair tests 17 passed + 16 subtests (unit) and 15 passed
+  (write-path F1/F2); Package 6 files
+  (`test_brain_write.py` + `test_artifact_validation.py` +
+  `test_brain_scope_integrity.py`) 129 passed + 16 subtests; full suite
+  `pytest tests/ -q` → **277 passed, 21 subtests passed**, zero
+  failures/skips; `check_exported()` → `True`; MCP tool-list/schema parity
+  (`test_brain_mcp.py`) → 6 passed, tool list unchanged.
+- **Diff hygiene:** delta touches exactly `brain/artifact_verifier.py`,
+  `brain/artifact_validation.py`, the two test files, this report, and the
+  spec's Package 6 section/changelog. No schema change, no MCP surface change,
+  no unrelated code.
+- **Git status after re-review:** working tree contains only this section's
+  edit to this file; branch `main` at `fa2e3b8` (two commits ahead of
+  `origin/main`, pre-existing). **No commit or push was created by this
+  re-review.**
