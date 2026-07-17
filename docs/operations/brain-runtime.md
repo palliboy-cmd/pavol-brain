@@ -34,26 +34,95 @@ Every Personal and WORK journal carries a persisted `brain_instance_identity` si
 
 `brain/control.py`'s `ControlStore.save()` refuses to persist a `write_enabled=True` profile for `brain_instance` `personal`/`work` unless `instance_paths(brain_instance)` already resolves to an existing, correctly-marked journal — a write grant can no longer be created for an instance that was never bootstrapped.
 
-### One-time backfill for pre-Package-1 journals
+### Instance-marker backfill runbook (operator, mini-core)
 
-A journal built before Package 1 has no marker and will refuse every write and read. Stamp it once, per instance, with `scripts/stamp_brain_instance.py`:
+A journal built before Package 1 has no `brain_instance_identity` marker and will refuse every write and read once Package 1 code is deployed. This is a **one-time, per-instance, backup-first, digest-verified** operation using the existing `scripts/stamp_brain_instance.py` — no new tooling is needed or should be invented for this. **Not yet run against any live journal.**
+
+Set these once per shell session (placeholders — do not hardcode a specific operator's home directory in any committed doc or script):
 
 ```sh
-# Dry run first — never mutates anything.
-.venv/bin/python scripts/stamp_brain_instance.py --journal-db "$HOME/Library/Application Support/Pavol-Brain/personal/journal.db" --instance-id personal
-.venv/bin/python scripts/stamp_brain_instance.py --journal-db "$HOME/Library/Application Support/Pavol-Brain/work/journal.db" --instance-id work
-
-# Apply — backs up the journal first (`<journal>.pre-instance-stamp-backup.db`), verifies the backup's
-# content digest matches, stamps inside its own transaction, then re-verifies the canonical tables
-# (memory_records/memory_events/record_state/artifact_links/artifact_validation_events) are byte-for-byte
-# unchanged before declaring success. Any failure restores the journal from the backup.
-.venv/bin/python scripts/stamp_brain_instance.py --journal-db "$HOME/Library/Application Support/Pavol-Brain/personal/journal.db" --instance-id personal --apply
-.venv/bin/python scripts/stamp_brain_instance.py --journal-db "$HOME/Library/Application Support/Pavol-Brain/work/journal.db" --instance-id work --apply
+BRAIN_HOME="${BRAIN_HOME:-$HOME/Library/Application Support/Pavol-Brain}"
+PERSONAL_JOURNAL="$BRAIN_HOME/personal/journal.db"
+WORK_JOURNAL="$BRAIN_HOME/work/journal.db"
+PY="$PWD/.venv/bin/python"   # repo-relative venv; adjust only if the operator's checkout differs
 ```
 
-The tool refuses (exit 2, nothing mutated) rather than guessing when: the journal is missing or fails `PRAGMA integrity_check`; it already carries a marker for a *different* instance; or its `memory_records.workspace` values are not a subset of that instance's workspace partition (`PERSONAL_WORKSPACES`/`WORK_WORKSPACES` in `brain/control.py`). Re-running against an already-stamped journal is a no-op (`already_stamped: true`, exit 0). By default the marker's `source_digest` is the journal's own current logical digest (self-referential — a backfill has no legacy snapshot to bind to); pass `--source-digest` explicitly to record the original bootstrap manifest's digest instead, for continuity with a manifest that predates this marker.
+**Step 1 — Preflight, read-only, both journals.** Confirms the journal exists, passes `PRAGMA integrity_check`, is not already marked for the *other* instance, and its `memory_records.workspace` values are a subset of that instance's partition (`PERSONAL_WORKSPACES`/`WORK_WORKSPACES` in `brain/control.py`). Mutates nothing — this is the same code path the dry run below uses, run here explicitly first so the operator sees the pre-stamp state before anything is written.
 
-**This backfill has not been run against any live instance journal.** It must be run once per Personal/WORK journal, on the host where they actually live, before this Package 1 code is deployed there — otherwise every write and read against those journals will start failing with `BRAIN_INSTANCE_MARKER_MISSING` the moment the new code is deployed.
+```sh
+sqlite3 "$PERSONAL_JOURNAL" "PRAGMA integrity_check; SELECT count(*) FROM brain_instance_identity;"
+sqlite3 "$WORK_JOURNAL" "PRAGMA integrity_check; SELECT count(*) FROM brain_instance_identity;"
+```
+
+Both `integrity_check` results must read `ok`. `brain_instance_identity` existing with `count=0` means unstamped-but-schema-current (expected pre-backfill state); a query error means the journal predates even that table and needs the schema migration reviewed before this runbook proceeds — **stop condition**, do not continue.
+
+**Step 2 — Digest/checksum capture (evidence, before any mutation).** Record the pre-backfill state independently of the script's own internal check, so the operator has an external before/after comparison:
+
+```sh
+shasum -a 256 "$PERSONAL_JOURNAL" "$WORK_JOURNAL"
+```
+
+Keep this output; compare it against Step 6's post-stamp `shasum` if any doubt arises about whether canonical bytes moved (they must not — see Step 6).
+
+**Step 3 — Dry run (explicit `--instance-id`, no `--apply`) — never mutates anything.**
+
+```sh
+"$PY" scripts/stamp_brain_instance.py --journal-db "$PERSONAL_JOURNAL" --instance-id personal
+"$PY" scripts/stamp_brain_instance.py --journal-db "$WORK_JOURNAL" --instance-id work
+```
+
+Read the printed JSON report: `blocked` must be `null` and `already_stamped` must be `false` (a `true` here means this journal is already stamped for this instance — skip straight to Step 6's verification, nothing to apply). Any non-null `blocked` value (`journal_missing`, `integrity_check_failed`, `marker_mismatch`, `workspace_partition_violation`) is a **stop condition** — do not pass `--apply` until the operator has investigated and resolved the specific reason named.
+
+**Step 4 — Backup-first apply.** `--apply` backs up the journal to `<journal>.pre-instance-stamp-backup.db` *before* any write, verifies the backup's logical digest matches the original, then stamps the marker inside its own transaction:
+
+```sh
+"$PY" scripts/stamp_brain_instance.py --journal-db "$PERSONAL_JOURNAL" --instance-id personal --apply
+"$PY" scripts/stamp_brain_instance.py --journal-db "$WORK_JOURNAL" --instance-id work --apply
+```
+
+By default the marker's `source_digest` is the journal's own current logical digest (self-referential — a backfill has no legacy bootstrap snapshot to bind to). Pass `--source-digest <digest>` explicitly only if continuity with a specific original bootstrap manifest's digest is required.
+
+**Step 5 — Automatic post-stamp verification (built into the script, no separate operator step).** After stamping, the script itself: re-reads the journal, asserts `PRAGMA integrity_check` still reads `ok`, and asserts the marker row now reads back the exact `instance_id`/`source_digest` just written. It also re-computes the logical digest of the five canonical tables (`memory_records`, `memory_events`, `record_state`, `artifact_links`, `artifact_validation_events`) and compares it against the value captured *before* stamping — any mismatch raises, and the exception handler restores the journal from the Step 4 backup before re-raising. A successful run's JSON report has `"stamped": true` and echoes the verified `marker`.
+
+**Step 6 — Manual post-stamp SQL verification (operator, independent of the script's own checks).**
+
+```sh
+sqlite3 "$PERSONAL_JOURNAL" "SELECT * FROM brain_instance_identity;"
+sqlite3 "$WORK_JOURNAL" "SELECT * FROM brain_instance_identity;"
+shasum -a 256 "$PERSONAL_JOURNAL" "$WORK_JOURNAL"
+```
+
+Confirm: exactly one row per journal, `instance_id` matches the journal's own directory (`personal`/`work`), `singleton=1`. The canonical-table byte content is unaffected by the stamp (it lives in a new table, not touched columns), but the journal *file's* own SHA-256 legitimately changes (the marker table itself is new data) — do not expect Step 2's file hash to still match; do expect the *logical digest of the five canonical tables* (what the script itself checks) to be unchanged, which Step 5 already proved automatically.
+
+**Step 7 — Byte/logical-content preservation check (independent record-count spot-check).**
+
+```sh
+sqlite3 "$PERSONAL_JOURNAL" "SELECT count(*) FROM memory_records; SELECT count(*) FROM memory_events;"
+```
+
+Compare against a count taken before Step 4 (or against the Package 1/2 live-audit figures already on file, if this is the first time these counts are captured) — they must be identical; the backfill adds one marker row to a new table and touches nothing else.
+
+**Rollback from backup.** The script auto-restores from `<journal>.pre-instance-stamp-backup.db` on any failure during apply (Step 4/5) — no operator action needed in that case. If a problem is discovered *after* a reported success (e.g., Step 6/7 disagrees with expectation), restore manually:
+
+```sh
+cp "$PERSONAL_JOURNAL" "$PERSONAL_JOURNAL.rollback-investigate.db"   # preserve the post-stamp state for forensics first
+cp "$PERSONAL_JOURNAL.pre-instance-stamp-backup.db" "$PERSONAL_JOURNAL"
+```
+
+Never hand-edit journal rows to "fix" a bad stamp — always restore from the backup file and re-run the dry run to diagnose.
+
+**Idempotent rerun.** Running the script again (with or without `--apply`) against an already-correctly-stamped journal returns `already_stamped: true`, exit 0, zero writes — safe to re-run as many times as needed, including accidentally.
+
+**Stop conditions (do not proceed past these without operator resolution):**
+- Step 1's `PRAGMA integrity_check` does not read `ok` on either journal.
+- Step 3's dry run reports any non-null `blocked` value.
+- Step 3's dry run reports `already_stamped: true` for the *wrong* instance (i.e., the WORK journal already carries a `personal` marker or vice versa) — this indicates the journal/directory pairing itself is wrong; fix the pairing before stamping anything, never force a re-stamp over a mismatched marker.
+- Step 5's automatic verification raises (the script already restores from backup in this case — treat this as a hard stop, investigate before retrying, do not immediately retry with `--apply` again without understanding why).
+- Any canonical-table count in Step 7 disagrees with the pre-backfill baseline.
+
+**Threat-model note (Package 1 review, finding M-2):** the identity marker `(instance_id, source_digest)` is an operational label under local-filesystem trust, not a cryptographic authenticity mechanism — anyone with filesystem write access to the journal could forge it. This is accepted for the declared single-operator local-machine threat model (§1 of `docs/reviews/package-1-bootstrap-instance-binding-review.md`) and does not weaken this runbook's backup/verify/rollback discipline, which protects against *accidental* corruption and operator error, not a malicious actor with existing filesystem access.
+
+**This backfill must be run once per Personal/WORK journal, on the host where they actually live (`mini-core`), before Package 1+ code is deployed there** — otherwise every write and read against those journals will start failing with `BRAIN_INSTANCE_MARKER_MISSING` the moment the new code is deployed. See "Controlled deployment and rollout" below for how this fits into the full rollout sequence.
 
 ### Bootstrap state machine and exit codes
 
@@ -77,6 +146,95 @@ Two distinct proof requirements back this table: completing the *manifest write*
 A plain preflight dry run (no `--apply`) never writes to a manifest that is already published on disk — its report goes to a sibling `<manifest>.preflight.json` instead, and the real manifest (the recovery classifier's own input) is left byte-for-byte untouched. `--apply` never reaches this path with an already-published on-disk manifest present, since `already_bootstrapped`/`live`/`completed_crash_after_manifest` all resolve earlier.
 
 Preflight-audit blocking (missing/overlapping/unknown workspaces, unresolved cross-partition references, count mismatches, integrity/FK failures, partition-constant mismatch) remains a separate `blocked` path with exit code 2, unchanged from before Package 1.
+
+## Controlled deployment and rollout
+
+This is the operator sequence for deploying Package 1–9's code to `mini-core` and completing the instance-marker backfill above. **Not yet executed** — recorded here so the sequence is reviewed before anyone runs it. Every step is written to be idempotent or safely re-runnable; none of them may be reordered without re-reading the "must not run before" column.
+
+| # | Step | Must stop / must not run before this | Rollback if this step fails |
+|---|---|---|---|
+| 1 | **Backup live journals.** `shasum -a 256` + file copy of `$PERSONAL_JOURNAL`, `$WORK_JOURNAL`, and the retrieval DBs to a timestamped location outside the deploy path. | Nothing prior required; this is the first step. | N/A — nothing has changed yet. |
+| 2 | **Stop write-capable agents and the projector.** `launchctl bootout` both `com.pavol.brain-projector-{personal,work}` LaunchAgents (see "Projector" above); ensure no MCP client with a `write_enabled` profile is mid-session (check `brain_health`/active SSH sessions). **No write-capable process may run again until step 9.** | Step 1 must be complete (backups exist before anything stops, so a failed stop can be diagnosed against a known-good backup). | Restart the LaunchAgents from their existing (pre-deploy) plists — no code changed yet. |
+| 3 | **Deploy code.** Pull/checkout the reviewed commit on `mini-core`; do not `git pull` into a mixed state — the checkout must move atomically (e.g., a fresh clone or `git checkout <sha>` with a clean tree) so no process ever sees half-old/half-new source. **Verify no projector or MCP process is running (step 2) before this step** — a running process holding old code while the working tree changes underneath it is exactly the mixed-version hazard this order prevents. | Step 2 (all write-capable/projector processes stopped). | `git checkout` back to the previous deployed SHA; nothing else has changed. |
+| 4 | **Run the marker backfill.** Follow "Instance-marker backfill runbook" above, in full, for both `personal` and `work`. **This must run before any Package-1-or-later code opens either journal** — every connect path (`JournalWriter`, `Repository`, `JournalReader`, the projector) refuses an unmarked journal with `BRAIN_INSTANCE_MARKER_MISSING` the instant new code touches it, and a half-completed backfill (one instance stamped, the other not) leaves the two instances in different verification states, so complete both before proceeding. | Steps 2 and 3 (nothing reads/writes the journal with new code while unmarked; code is already the reviewed version so the marker check is actually active). | Follow the backfill runbook's own "Rollback from backup" section — restore each journal independently from its own `.pre-instance-stamp-backup.db`; this does not require re-deploying code. |
+| 5 | **Verify journal markers.** `sqlite3 "$PERSONAL_JOURNAL" "SELECT * FROM brain_instance_identity;"` and the same for WORK — confirm exactly one row each, `instance_id` matching the journal's own directory. This is the same check as backfill Step 6, repeated here as the deployment gate. | Step 4 complete for both instances. | If a marker is wrong or missing, do not proceed to step 6 — return to step 4's rollback. |
+| 6 | **Rebuild or validate retrieval DB markers.** Run `run_brain_projector.py --instance-id <id> --validate` (read-only) against each retrieval DB. If it reports `retrieval_instance_marker_missing`/`retrieval_instance_marker_mismatch` (via `REBUILD_REQUIRED`), delete that retrieval DB and let step 8's first projector run rebuild and re-stamp it from empty — retrieval is fully derived and disposable (I12); never hand-edit its rows. | Step 5 (journal markers verified correct — a retrieval rebuild reads the journal, so the journal must already be correctly marked). | Deleting a retrieval DB is itself the rollback for a bad retrieval marker — it is always safe, since it is rebuilt from the journal on the next run. |
+| 7 | **Run acceptance smoke.** From the deployed checkout: `python scripts/run_brain_acceptance.py` and `pytest tests/ -q` (see "Acceptance and diagnostic commands" below) against the deployed code — not against a developer machine — to confirm the deployed environment (Python version, dependencies) actually reproduces the reviewed green suite. | Steps 3–6 (code deployed, markers correct on both journal and retrieval sides). | A red suite here means stop the rollout — do not proceed to step 8; return to step 3's rollback (revert code) and re-diagnose before retrying. |
+| 8 | **Restart the projector.** Re-`launchctl bootstrap`/reinstall both `com.pavol.brain-projector-{personal,work}` LaunchAgents (`scripts/install_brain_m1_projectors.sh`, passing `--instance-id` per the H-2 fix); confirm one bounded run completes with `HEALTHY` or `NO_CHANGES`, not `REBUILD_REQUIRED`/`FAILED`. | Step 7 green. | `launchctl bootout` again; retrieval DB deletion (step 6's rollback) is still safe at this point if the first run surfaces a problem. |
+| 9 | **Restart MCP/write clients.** Only now re-enable write-capable profiles/sessions (this is the first point since step 2 that a write-enabled profile may safely operate against the newly-marked journals). Verify `ControlStore` write profiles are still accepted (`ControlStore.save` requires a marked journal — this now exists) before any agent actually writes. | Step 8 (projector confirmed healthy) — writing before the projector is confirmed healthy risks a backlog the projector then has to catch up on blind; not unsafe by construction, but avoid it operationally. | Disable the write-enabled profile(s) again (`ControlStore`) if a problem surfaces; this does not require touching the journal or code. |
+| 10 | **Monitor audit/errors.** Watch the audit JSONL (`BRAIN_AUDIT_LOG`) and projector logs for the rollback window (see "Rollback plan" below for the exact duration and criteria) for `BRAIN_INSTANCE_*` errors, unexpected `BRAIN_IDEMPOTENCY_*` conflicts, or `REBUILD_REQUIRED`. | Step 9. | See "Rollback plan" below for the decision point and full rollback procedure. |
+| 11 | **Rollback criteria.** See "Rollback plan" below — do not improvise a rollback path outside what is documented there. | — | — |
+
+**Personal vs WORK wiring verification (do this explicitly, not just by inspection of config):** attempt to open the `personal` journal with a `BrainConfig(instance_id="work")` and confirm `BRAIN_INSTANCE_MISMATCH` (and the reverse) — this is exactly what `tests/test_brain_instance_bootstrap.py::test_journal_writer_refuses_on_instance_mismatch` proves in fixtures; running the equivalent by hand against the real files (read-only — do not actually write) is the deployment-time confirmation that the launcher's env-derived paths are wired to the correct physical files, not just conventionally believed to be.
+
+**Write-enabled profile verification:** query `ControlStore` (`brain_control_center` or a direct read) for each profile's `write_enabled`/`brain_instance`/workspace grants; confirm every write-enabled profile's `brain_instance` resolves (via `instance_paths`) to a journal that now carries a matching marker (step 5) — `ControlStore.save` already refuses to create such a profile without one, but an operator inspecting *existing* profiles after a code deploy should confirm none were created before this gate existed under a since-invalidated assumption.
+
+**Preventing mixed-version runtime:** the ordering above (stop everything in step 2, deploy in step 3, only restart in steps 8–9) is the whole mechanism — no write-capable or projector process may hold old code in memory while the on-disk journal/retrieval schema or marker state changes underneath it. If any step 2 process cannot be confirmed stopped (e.g., an SSH session outside operator control), treat that as a stop condition for the entire rollout, not a step to skip.
+
+## Rollback plan
+
+**Code rollback:** `git checkout <previous-deployed-sha>` on `mini-core`; safe at any point, since no step above makes an irreversible code-side change — the journal/retrieval side is what needs its own, separate rollback below.
+
+**Journal marker rollback:** restore each journal from its own `<journal>.pre-instance-stamp-backup.db` (created by the backfill runbook's Step 4) — **the journal is the source of truth and is never restored from, or reconciled against, the retrieval DB.** Never hand-edit journal rows to undo a stamp or anything else; a restore-from-backup is the only supported path. If the backup itself is suspect, stop — do not improvise; the situation needs operator judgment, not a scripted recovery.
+
+**Retrieval DB rollback/rebuild:** the retrieval DB is always safe to delete outright — it is a fully derived, disposable projection (I12) and the next projector run rebuilds it from the journal from an empty cursor. There is no "restore the retrieval DB from backup" path because there is never a need for one; deletion-and-rebuild is strictly simpler and always correct. Use the existing backup/parity/atomic-switch procedure in "Projector" above when replacing an *active* index rather than an empty one.
+
+**Control DB/profile rollback:** `ControlStore` profiles are operator CRUD, separate from the journal/retrieval artifacts — disable (`write_enabled=False`) or delete a profile directly via `control_center.py`/`ControlStore`; this never touches journal or retrieval files and can be done independently of any other rollback step.
+
+**LaunchAgent restart rollback:** `launchctl bootout` both `com.pavol.brain-projector-{personal,work}` labels and reinstall the previous plist versions if the LaunchAgent template itself changed; if only the underlying code changed (not the plist), a `bootout` + `bootstrap` cycle against the rolled-back code is sufficient.
+
+**Decision point — rollback vs. continue:** roll back immediately (do not attempt to "fix forward" mid-rollout) if any of: step 5's marker verification fails after the backfill runbook's own stop conditions were already satisfied; step 7's acceptance smoke is red on the deployed checkout; step 8's first projector run reports `REBUILD_REQUIRED` or `FAILED` (rebuild-and-retry once per "Health interpretation" above is acceptable before calling this a rollback trigger — only escalate to rollback if a fresh rebuild also fails); or step 10's monitoring window surfaces a `BRAIN_INSTANCE_MISMATCH`/`BRAIN_INSTANCE_MARKER_MISSING` error from a live client (this means the wiring verification above was not actually correct, and continuing risks a genuine misroute). Continue (do not roll back) for an isolated, explained `BRAIN_IDEMPOTENCY_CONFLICT` from a client replaying with different metadata — that is the system working as designed (§6), not a rollout defect.
+
+## Acceptance and diagnostic commands
+
+Run from the repo root, against the target checkout (repo-relative paths; `$PY` as defined above):
+
+```sh
+# Acceptance runner (§10-mapped modules only)
+"$PY" scripts/run_brain_acceptance.py
+
+# Full suite (authoritative)
+"$PY" -m pytest tests/ -q
+
+# Schema export parity
+"$PY" -c "from brain.schemas import check_exported; print(check_exported())"
+
+# MCP tool-list / search-schema parity
+"$PY" -m pytest tests/test_brain_mcp.py -k test_exact_tool_list_and_search_schema_parity -q
+
+# Bootstrap dry-run / status diagnostics (read-only; omit --apply)
+"$PY" scripts/bootstrap_brain_instances.py --source "$LEGACY_SOURCE" \
+  --personal-journal "$PERSONAL_JOURNAL" --work-journal "$WORK_JOURNAL" \
+  --personal-workspaces "$PERSONAL_WORKSPACES_CSV" --work-workspaces "$WORK_WORKSPACES_CSV" \
+  --manifest /tmp/bootstrap-status-preflight.json
+
+# Instance-marker query (read-only)
+sqlite3 "$PERSONAL_JOURNAL" "SELECT * FROM brain_instance_identity;"
+sqlite3 "$WORK_JOURNAL" "SELECT * FROM brain_instance_identity;"
+
+# Projector plan/status (read-only; never calls the embedding endpoint)
+"$PY" scripts/run_brain_projector.py --journal-db "$PERSONAL_JOURNAL" --retrieval-db "$PERSONAL_RETRIEVAL_DB" --instance-id personal --plan
+"$PY" scripts/run_brain_projector.py --journal-db "$WORK_JOURNAL" --retrieval-db "$WORK_RETRIEVAL_DB" --instance-id work --plan
+
+# Read-only reference/secret audits (both live journals)
+"$PY" scripts/audit_record_references.py --journal personal="$PERSONAL_JOURNAL" --journal work="$WORK_JOURNAL"
+"$PY" scripts/audit_write_envelope_secrets.py --journal personal="$PERSONAL_JOURNAL" --journal work="$WORK_JOURNAL"
+
+# git hygiene
+git diff --check
+```
+
+## Manual and live evidence
+
+| Evidence item | Status | Date | Source document | Rerun required before rollout? |
+|---|---|---|---|---|
+| Package 2 record-reference audit (both live journals) | Completed | 2026-07-16 | `docs/reviews/package-2-record-reference-audit.md` §2 | No — zero findings recorded; `scripts/audit_record_references.py` is available to re-run at any time as a cheap confirmation, not required |
+| Package 4 write-envelope secret audit (both live journals) | Completed | 2026-07-16 | `docs/architecture/write-safety-integrity-repair-spec.md` §11 Package 4 changelog; `docs/reviews/package-4-write-envelope-filtering-review.md` "Required follow-up verification" | No — 0 blocking/informational findings recorded; re-run only if new write paths are added before rollout |
+| Package 1 live instance-marker backfill (`scripts/stamp_brain_instance.py` against the real `personal`/`work` journals) | **Pending** | — | `docs/reviews/package-1-bootstrap-instance-binding-review.md` §5; this document's "Instance-marker backfill runbook" above | **Yes — required, not yet run** |
+| Live controlled deploy (Packages 1–9 to `mini-core`) | **Pending** | — | This document's "Controlled deployment and rollout" section | **Yes — required, not yet run** |
+| §12 Final Fable acceptance checklist | **Pending** | — | `docs/architecture/write-safety-integrity-repair-spec.md` §12 | **Yes — required before `READY FOR CONTROLLED WRITE ROLLOUT`/`READY WITH EXPLICIT LIMITATIONS` verdict** |
+
+Do not read the table above as "live rollout is done" — only the first two rows are. The bottom three gate the actual rollout and are unaffected by any docs/tests-only package (Package 9 included).
 
 ## Health interpretation
 
