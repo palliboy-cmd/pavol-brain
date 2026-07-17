@@ -865,3 +865,104 @@ def test_search_include_artifacts_carries_the_same_trust_view_as_get_related(tmp
     trust = trust_for(row.artifact_links, uri)
     assert trust["state"] == "verified_active"
     assert trust["verifier"] == "server-artifact-validator"
+
+# ---------------------------------------------------------------------------
+# B9 repair (F1/F2, docs/reviews/package-6-artifact-trust-review.md): F1
+# closed the git option-injection hole (repo://alias/-v etc. minting a false
+# verified_active / Band-A escalation); F2 closed the malformed-evidence-JSON
+# crash on read. These reproduce both end-to-end through the real write/read
+# paths, on top of the pure-function unit tests in test_artifact_validation.py.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("relative", ["-v", "--error-unmatch", "--", "-c", "--exclude-standard", "-n"])
+def test_f1_repo_option_like_artifact_never_forges_band_a_or_verified_active(tmp_path, relative):
+    b, journal = brain(tmp_path)
+    uri = f"repo://pavol-brain/{relative}"
+    rec = b.record_outcome(**outcome(artifacts=[uri], idempotency_key="f1-repo-probe"))
+    assert rec.policy_band != "A"
+    assert rec.status != "accepted"
+    con = sqlite3.connect(journal); con.row_factory = sqlite3.Row
+    event = con.execute("SELECT state,evidence FROM artifact_validation_events WHERE artifact_record_id=? AND artifact_uri=?",
+                         (rec.record_id, uri)).fetchone()
+    con.close()
+    assert event["state"] != "verified_active"
+    assert json.loads(event["evidence"]).get("object_digest") is None
+
+@pytest.mark.parametrize("revision", ["-v", "--help", "--", "-n"])
+def test_f1_git_option_like_revision_never_forges_band_a_or_verified_active(tmp_path, revision):
+    b, journal = brain(tmp_path)
+    uri = f"git://pavol-brain/commit/{revision}"
+    rec = b.record_outcome(**outcome(artifacts=[], commit=uri, idempotency_key="f1-git-probe"))
+    assert rec.policy_band != "A"
+    assert rec.status != "accepted"
+    con = sqlite3.connect(journal); con.row_factory = sqlite3.Row
+    event = con.execute("SELECT state,evidence FROM artifact_validation_events WHERE artifact_record_id=? AND artifact_uri=?",
+                         (rec.record_id, uri)).fetchone()
+    con.close()
+    assert event["state"] != "verified_active"
+    assert json.loads(event["evidence"]).get("object_digest") is None
+
+def test_f1_end_to_end_fable_probe_no_longer_bands_a_or_verifies_active(tmp_path):
+    # Exact reproduction of the review's Fable probe:
+    #   record_outcome(artifacts=["repo://pavol-brain/-v"], source_assertion="verified_tool_result")
+    # Baseline (pre-fix): policy_band="A", status="accepted", review="auto_accepted",
+    # artifact_trust.state="verified_active" for an artifact that does not exist.
+    # After the fix: never Band A, never verified_active, never auto_accepted.
+    b, journal = brain(tmp_path)
+    rec = b.record_outcome(**outcome(artifacts=["repo://pavol-brain/-v"], source_assertion="verified_tool_result",
+                                      idempotency_key="f1-fable-probe"))
+    assert rec.policy_band != "A"
+    assert rec.status != "accepted"
+    assert rec.review != "auto_accepted"
+    con = sqlite3.connect(journal); con.row_factory = sqlite3.Row
+    event = con.execute("SELECT state,evidence FROM artifact_validation_events WHERE artifact_record_id=? AND artifact_uri=?",
+                         (rec.record_id, "repo://pavol-brain/-v")).fetchone()
+    con.close()
+    assert event["state"] != "verified_active"
+    meta = json.loads(event["evidence"])
+    assert meta.get("object_digest") is None
+    assert str(ROOT) not in event["evidence"] and "/Users/" not in event["evidence"]
+
+def test_f2_malformed_validation_evidence_fails_safe_on_get_related(tmp_path):
+    # F2: a corrupt/legacy artifact_validation_events.evidence value must
+    # never crash the read path, and must never surface as verified even
+    # when the fold's current_state (set here by the normal write path,
+    # before the corruption below) says verified_active.
+    b, journal = brain(tmp_path)
+    uri = "repo://pavol-brain/brain/api.py"
+    rec = b.record_problem(statement="malformed evidence read", impact="test", evidence=[uri],
+                            source_assertion="explicit_user_confirmation", workspace="personal",
+                            idempotency_key="f2-malformed-evidence-related")
+    con = sqlite3.connect(journal)
+    before_state = con.execute("SELECT state FROM artifact_validation_events WHERE artifact_record_id=? AND artifact_uri=?",
+                                (rec.record_id, uri)).fetchone()[0]
+    con.execute("UPDATE artifact_validation_events SET evidence=? WHERE artifact_record_id=? AND artifact_uri=?",
+                ("{not valid json", rec.record_id, uri))
+    con.commit(); con.close()
+    assert before_state == "verified_active"
+    related = b.get_related(rec.record_id, allowed_workspaces=["personal"]).related
+    trust = trust_for(related, uri)
+    assert trust["state"] == "unverified_reference"
+    assert trust["reason"] == "malformed_validation_metadata"
+    assert "{not valid json" not in json.dumps(related)
+
+def test_f2_malformed_validation_evidence_fails_safe_on_search_include_artifacts(tmp_path):
+    b, journal = brain(tmp_path)
+    uri = "repo://pavol-brain/brain/api.py"
+    problem_rec = b.record_problem(statement="malformed evidence search parity", impact="test", evidence=[uri],
+                                    source_assertion="explicit_user_confirmation", workspace="personal",
+                                    idempotency_key="f2-malformed-evidence-search")
+    con = sqlite3.connect(journal)
+    con.execute("UPDATE artifact_validation_events SET evidence=? WHERE artifact_record_id=? AND artifact_uri=?",
+                ("[]", problem_rec.record_id, uri))
+    con.commit(); con.close()
+    retrieval = tmp_path / "retrieval.db"
+    projector = ProjectionProjector(ProjectorConfig(journal, retrieval, "fake", 4, "fake", instance_id="personal"), FakeEmbedder())
+    while projector.run_once(100).status == ProjectionStatus.HEALTHY: pass
+    scoped = Brain(BrainConfig(journal_db_path=journal, retrieval_db_path=retrieval, embedding_dimension=4,
+                                endpoint_probe_timeout=.01, client_identity="reader", instance_id="personal"), NoopTransport())
+    result = scoped.search(query="malformed evidence search parity", workspaces=["personal"], types=["problem"], limit=10, include_artifacts=True)
+    row = next(item for item in result.results if item.record_id == problem_rec.record_id)
+    trust = trust_for(row.artifact_links, uri)
+    assert trust["state"] == "unverified_reference"
+    assert trust["reason"] == "malformed_validation_metadata"

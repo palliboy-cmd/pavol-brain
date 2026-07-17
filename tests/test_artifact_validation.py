@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sqlite3
 import sys
@@ -185,6 +186,137 @@ class ArtifactVerifierDigestTests(unittest.TestCase):
         self.assertEqual(result["method"], "repo_unavailable")
         self.assertEqual(result["repo_alias"], "ghost-repo")
         self.assertIsNone(result["object_digest"])
+
+
+class ArtifactVerifierArgumentIsolationTests(unittest.TestCase):
+    """B9 repair (F1, docs/reviews/package-6-artifact-trust-review.md): the
+    relative-path/revision component of a repo:// or git:// URI is client
+    controlled. Before the fix, ``git ls-files --error-unmatch <relative>``
+    and ``git cat-file -e <revision>^{commit}`` had no options terminator,
+    so a component beginning with ``-`` (e.g. ``-v``) was consumed as a git
+    option instead of a pathspec/object, the check exited 0 with nothing to
+    fail on, and a nonexistent artifact minted ``verified_active``."""
+
+    OPTION_LIKE_RELATIVE = ("-v", "--", "--error-unmatch", "-n", "-c", "--exclude-standard")
+    OPTION_LIKE_REVISION = ("-v", "--help", "--", "-n")
+
+    def test_option_like_relative_path_never_verifies_active(self):
+        for relative in self.OPTION_LIKE_RELATIVE:
+            with self.subTest(relative=relative):
+                result = verify(f"repo://pavol-brain/{relative}", {"pavol-brain": str(ROOT)})
+                self.assertNotEqual(result["state"], "verified_active")
+                self.assertFalse(result["valid"])
+                self.assertIsNone(result["object_digest"])
+
+    def test_option_like_git_revision_never_verifies_active(self):
+        for revision in self.OPTION_LIKE_REVISION:
+            with self.subTest(revision=revision):
+                result = verify(f"git://pavol-brain/commit/{revision}", {"pavol-brain": str(ROOT)})
+                self.assertNotEqual(result["state"], "verified_active")
+                self.assertFalse(result["valid"])
+                self.assertIsNone(result["object_digest"])
+
+    def test_traversal_and_absolute_relative_paths_never_verify_active(self):
+        for relative in ("../../etc/passwd", "/etc/passwd", "sub/../../../etc/passwd"):
+            with self.subTest(relative=relative):
+                result = verify(f"repo://pavol-brain/{relative}", {"pavol-brain": str(ROOT)})
+                self.assertNotEqual(result["state"], "verified_active")
+
+    def test_nul_byte_relative_path_and_revision_never_verify_active(self):
+        self.assertNotEqual(verify("repo://pavol-brain/a\x00b", {"pavol-brain": str(ROOT)})["state"], "verified_active")
+        self.assertNotEqual(verify("git://pavol-brain/commit/a\x00b", {"pavol-brain": str(ROOT)})["state"], "verified_active")
+
+    def test_normal_tracked_file_still_verifies_active(self):
+        result = verify("repo://pavol-brain/brain/api.py", {"pavol-brain": str(ROOT)})
+        self.assertEqual(result["state"], "verified_active")
+
+    def test_normal_missing_file_stays_verified_inactive(self):
+        result = verify("repo://pavol-brain/does-not-exist", {"pavol-brain": str(ROOT)})
+        self.assertEqual(result["state"], "verified_inactive")
+
+    def test_valid_commit_sha_still_verifies_active(self):
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+        result = verify(f"git://pavol-brain/commit/{head}", {"pavol-brain": str(ROOT)})
+        self.assertEqual(result["state"], "verified_active")
+        self.assertEqual(result["object_digest"], head)
+
+    def test_invalid_normal_revision_stays_verified_inactive(self):
+        result = verify("git://pavol-brain/commit/" + "0" * 40, {"pavol-brain": str(ROOT)})
+        self.assertEqual(result["state"], "verified_inactive")
+        self.assertIsNone(result["object_digest"])
+
+    def test_legitimate_dash_prefixed_tracked_filename_is_conservatively_rejected(self):
+        """The path/git model chosen here does not support verifying a real
+        tracked file whose name begins with `-`: any relative component that
+        could be misread as an option is rejected before it ever reaches
+        git, which is what closes F1. The `--` terminator alone would let
+        such a name verify correctly, but rejecting option-shaped input
+        outright is the simpler, audit-friendly invariant, and no artifact
+        this module is used to verify is expected to have such a name."""
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "t"], cwd=repo, check=True)
+            dashed = repo / "-tracked-file.txt"
+            dashed.write_text("x")
+            subprocess.run(["git", "add", "--", str(dashed)], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=repo, check=True)
+            result = verify("repo://alias/-tracked-file.txt", {"alias": str(repo)})
+            self.assertNotEqual(result["state"], "verified_active")
+
+
+class ArtifactTrustViewFailSafeTests(unittest.TestCase):
+    """B9 repair (F2, docs/reviews/package-6-artifact-trust-review.md):
+    ``trust_view``'s ``json.loads(state_row["evidence"])`` had no guard, so
+    malformed/legacy evidence raised ``JSONDecodeError`` out of the read
+    path (``get_related``/``search(include_artifacts=True)``) instead of
+    failing safe like the missing-row case."""
+
+    def test_invalid_json_text_fails_safe(self):
+        row = {"current_state": "verified_active", "evidence": "{not json"}
+        self.assertEqual(av.trust_view(row), {**av._UNVERIFIED, "reason": "malformed_validation_metadata"})
+
+    def test_empty_string_evidence_keeps_existing_null_metadata_behavior(self):
+        # Not malformed JSON -- absent evidence -- which is the pre-existing,
+        # already-reviewed "folds cleanly" behavior (state stands, metadata
+        # null); F2 does not change this case.
+        row = {"current_state": "verified_active", "evidence": ""}
+        self.assertEqual(av.trust_view(row), {**av._UNVERIFIED, "state": "verified_active"})
+
+    def test_json_list_instead_of_object_fails_safe(self):
+        row = {"current_state": "verified_active", "evidence": "[1,2,3]"}
+        self.assertEqual(av.trust_view(row), {**av._UNVERIFIED, "reason": "malformed_validation_metadata"})
+
+    def test_json_scalar_fails_safe(self):
+        for evidence in ("42", '"a string"', "true"):
+            with self.subTest(evidence=evidence):
+                row = {"current_state": "verified_active", "evidence": evidence}
+                self.assertEqual(av.trust_view(row), {**av._UNVERIFIED, "reason": "malformed_validation_metadata"})
+
+    def test_json_null_fails_safe(self):
+        row = {"current_state": "verified_active", "evidence": "null"}
+        self.assertEqual(av.trust_view(row), {**av._UNVERIFIED, "reason": "malformed_validation_metadata"})
+
+    def test_object_with_wrong_field_types_does_not_crash(self):
+        row = {"current_state": "verified_active",
+               "evidence": json.dumps({"method": 123, "verifier": ["a", "b"], "object_digest": 4.5, "reason": None})}
+        trust = av.trust_view(row)
+        self.assertEqual(trust["state"], "verified_active")
+        self.assertEqual(trust["method"], 123)
+
+    def test_missing_evidence_field_does_not_raise_key_error(self):
+        row = {"current_state": "verified_active"}
+        self.assertEqual(av.trust_view(row), {**av._UNVERIFIED, "state": "verified_active"})
+
+    def test_verified_active_state_with_malformed_metadata_never_reports_verified(self):
+        # The exact failure scenario in the review: the fold state itself
+        # says verified_active, but the joined event's evidence is corrupt.
+        # The response must never claim verified.
+        row = {"current_state": "verified_active", "evidence": "{broken"}
+        trust = av.trust_view(row)
+        self.assertEqual(trust["state"], "unverified_reference")
+        self.assertNotIn("verified_active", trust.values())
 
 
 if __name__ == "__main__":

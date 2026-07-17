@@ -114,6 +114,10 @@ def canonical_table_digest(con):
     return digest.hexdigest()
 
 
+_UNVERIFIED = {"state": "unverified_reference", "method": None, "verifier": None,
+                "verified_at": None, "digest": None, "reason": None}
+
+
 def trust_view(state_row):
     """Read-only client-facing trust object for one artifact relation.
 
@@ -124,11 +128,31 @@ def trust_view(state_row):
     the write path never ran verify_all over this URI, or the row is
     otherwise unavailable -- presents as `unverified_reference`, never as
     verified. A client can never influence any field returned here.
+
+    B9 repair (F2): ``evidence`` is only ever server-written valid JSON
+    going forward, but this reads back arbitrary historical/legacy rows, so
+    a missing column, unparseable text, or a non-object JSON value (list,
+    string, number, null) must fold to the same fail-safe shape rather than
+    raise out of the read path -- and never as a `verified_*` state, even
+    when the stored ``current_state`` itself says otherwise. The raw value
+    is never echoed back; only a fixed internal reason names the cause.
     """
     if state_row is None:
-        return {"state": "unverified_reference", "method": None, "verifier": None,
-                "verified_at": None, "digest": None, "reason": None}
-    meta = json.loads(state_row["evidence"]) if state_row["evidence"] else {}
+        return dict(_UNVERIFIED)
+    try:
+        raw = state_row["evidence"]
+    except (KeyError, IndexError):
+        raw = None
+    meta = {}
+    if raw:
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            parsed = None
+        if isinstance(parsed, dict):
+            meta = parsed
+        else:
+            return {**_UNVERIFIED, "reason": "malformed_validation_metadata"}
     return {
         "state": PUBLIC_STATE.get(state_row["current_state"], "unverified_reference"),
         "method": meta.get("method"),
