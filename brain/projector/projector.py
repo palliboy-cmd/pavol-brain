@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS retrieval_document_links (
 );
 """
 KNOWN_EVENT_TYPES = {"record_created", "record_approved", "record_rejected", "record_superseded", "record_forgotten", "projection_started", "projection_succeeded", "projection_failed"}
+CLOSED_SKIP_REASONS = frozenset({"status_candidate", "status_rejected", "status_forgotten", "artifact_no_verified_active_relations", "not_eligible"})
 
 
 class ProjectionProjector:
@@ -91,14 +92,41 @@ class ProjectionProjector:
     def _inject(self, point):
         if self.failure_injector: self.failure_injector(point)
 
-    def _remove(self, con, record_id, report):
-        row = con.execute("SELECT record_id FROM retrieval_documents WHERE record_id=?", (record_id,)).fetchone()
-        if not row: report.noops += 1; return "already_absent"
-        report.links_removed += con.execute("SELECT count(*) FROM retrieval_document_links WHERE record_id=?", (record_id,)).fetchone()[0]
+    def _delete_embedding(self, con, record_id):
         con.execute("DELETE FROM retrieval_embeddings WHERE record_id=?", (record_id,))
-        con.execute("DELETE FROM retrieval_fts WHERE rowid=(SELECT doc_id FROM retrieval_documents WHERE record_id=?)", (record_id,))
-        con.execute("DELETE FROM retrieval_documents WHERE record_id=?", (record_id,)); report.removed += 1
+
+    def _delete_fts(self, con, doc_id):
+        con.execute("DELETE FROM retrieval_fts WHERE rowid=?", (doc_id,))
+
+    def _delete_links(self, con, record_id):
+        con.execute("DELETE FROM retrieval_document_links WHERE record_id=?", (record_id,))
+
+    def _delete_document(self, con, record_id):
+        con.execute("DELETE FROM retrieval_documents WHERE record_id=?", (record_id,))
+
+    def _remove(self, con, record_id, report):
+        row = con.execute("SELECT doc_id FROM retrieval_documents WHERE record_id=?", (record_id,)).fetchone()
+        if not row: report.noops += 1; return "already_absent"
+        doc_id = row["doc_id"]
+        report.links_removed += con.execute("SELECT count(*) FROM retrieval_document_links WHERE record_id=?", (record_id,)).fetchone()[0]
+        self._delete_embedding(con, record_id)
+        self._delete_fts(con, doc_id)
+        self._delete_links(con, record_id)
+        self._delete_document(con, record_id)
+        report.removed += 1
+        self._assert_removed(con, record_id, doc_id)
         return "removed"
+
+    def _assert_removed(self, con, record_id, doc_id):
+        """Gate cursor movement on verified absence, not merely on the DELETE statements not raising."""
+        if con.execute("SELECT 1 FROM retrieval_documents WHERE record_id=?", (record_id,)).fetchone():
+            raise ProjectorError("removed_record_document_still_present")
+        if con.execute("SELECT 1 FROM retrieval_embeddings WHERE record_id=?", (record_id,)).fetchone():
+            raise ProjectorError("removed_record_embedding_still_present")
+        if con.execute("SELECT 1 FROM retrieval_fts WHERE rowid=?", (doc_id,)).fetchone():
+            raise ProjectorError("removed_record_fts_row_still_present")
+        if con.execute("SELECT 1 FROM retrieval_document_links WHERE record_id=?", (record_id,)).fetchone():
+            raise ProjectorError("removed_record_links_still_present")
 
     def _upsert(self, con, doc, report):
         previous = con.execute("SELECT * FROM retrieval_documents WHERE record_id=?", (doc["record_id"],)).fetchone()
@@ -130,8 +158,8 @@ class ProjectionProjector:
         return action
 
     def _assert_projected(self, con, doc):
-        """Gate cursor movement on a complete derived document + embedding pair."""
-        row = con.execute("""SELECT d.projection_hash document_hash,e.projection_hash embedding_hash,
+        """Gate cursor movement on a complete derived document + embedding + FTS row + exact link set."""
+        row = con.execute("""SELECT d.doc_id,d.projection_hash document_hash,e.projection_hash embedding_hash,
                           e.model_fingerprint,e.dimensions
                           FROM retrieval_documents d LEFT JOIN retrieval_embeddings e USING(record_id)
                           WHERE d.record_id=?""", (doc["record_id"],)).fetchone()
@@ -143,14 +171,27 @@ class ProjectionProjector:
             raise ProjectorError("accepted_record_missing_or_mismatched_embedding")
         if row["model_fingerprint"] != self.config.embedding_model_fingerprint or row["dimensions"] != self.config.embedding_dimension:
             raise ProjectorError("accepted_record_embedding_contract_mismatch")
+        fts = con.execute("SELECT title,body,artifacts_text FROM retrieval_fts WHERE rowid=?", (row["doc_id"],)).fetchone()
+        if not fts:
+            raise ProjectorError("accepted_record_missing_fts_row")
+        if (fts["title"], fts["body"], fts["artifacts_text"]) != (doc["title"], doc["body"], doc["artifacts_text"]):
+            raise ProjectorError("accepted_record_fts_row_stale")
+        stored_links = {(r["artifact_uri"], r["relation"], r["confidence"], r["origin"], r["verified_at"])
+                         for r in con.execute("SELECT artifact_uri,relation,confidence,origin,verified_at FROM retrieval_document_links WHERE record_id=?", (doc["record_id"],))}
+        desired_links = {(link["artifact_uri"], link["relation"], link["confidence"], link["origin"], link["verified_at"]) for link in doc["artifact_links"]}
+        if stored_links != desired_links:
+            raise ProjectorError("accepted_record_link_set_mismatch")
 
     @staticmethod
     def _skip_reason(record):
         if record["status"] in FORBIDDEN:
-            return "status_" + record["status"]
-        if record["type"] == "artifact_link":
-            return "artifact_no_verified_active_relations"
-        return "not_eligible"
+            reason = "status_" + record["status"]
+        elif record["type"] == "artifact_link":
+            reason = "artifact_no_verified_active_relations"
+        else:
+            reason = "not_eligible"
+        assert reason in CLOSED_SKIP_REASONS, reason
+        return reason
 
     def run_once(self, batch_size=100):
         with self._write() as con:
@@ -185,13 +226,13 @@ class ProjectionProjector:
                     record = snapshots[record_id]
                     if not eligible(record):
                         outcomes.append({"record_id": record_id, "result": "skipped", "reason": self._skip_reason(record),
-                                         "action": self._remove(con, record_id, report)})
+                                         "action": self._remove(con, record_id, report), "source_event_id": source_id})
                     else:
                         doc = document(record, source_id, self.config.projection_schema_version)
                         action = self._upsert(con, doc, report)
                         self._assert_projected(con, doc)
                         outcomes.append({"record_id": record_id, "result": "projected", "action": action,
-                                         "projection_hash": doc["projection_hash"]})
+                                         "projection_hash": doc["projection_hash"], "source_event_id": source_id})
                 report.details["record_outcomes"] = outcomes
                 self._inject("after_documents"); self._inject("after_embeddings"); self._inject("before_cursor_update")
                 set_cursor(con, report.cursor_after, self.config); self._inject("before_commit")

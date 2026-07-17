@@ -26,6 +26,35 @@ class FakeEmbedder:
         return [float((seed >> (8 * i)) % 17 + 1) for i in range(self.dimension)], "fake-embedder"
 
 
+class _MutateAfterUpsert(ProjectionProjector):
+    """Test-only hook: corrupt a target record's derived rows immediately after
+    _upsert writes them, so run_once()'s same-transaction _assert_projected must
+    catch it before the cursor advances."""
+    def __init__(self, config, embedder, target_record_id, mutate, failure_injector=None):
+        super().__init__(config, embedder, failure_injector)
+        self._target_record_id = target_record_id
+        self._mutate = mutate
+    def _upsert(self, con, doc, report):
+        action = super()._upsert(con, doc, report)
+        if doc["record_id"] == self._target_record_id:
+            self._mutate(con, doc)
+        return action
+
+
+class _SkipRemovalStep(ProjectionProjector):
+    """Test-only hook: skip exactly one deletion step inside _remove so the
+    same-transaction _assert_removed check must catch the leftover row."""
+    def __init__(self, config, embedder, skip_step, failure_injector=None):
+        super().__init__(config, embedder, failure_injector)
+        self._skip_step = skip_step
+    def _delete_document(self, con, record_id):
+        if self._skip_step != "document": super()._delete_document(con, record_id)
+    def _delete_embedding(self, con, record_id):
+        if self._skip_step != "embedding": super()._delete_embedding(con, record_id)
+    def _delete_fts(self, con, doc_id):
+        if self._skip_step != "fts": super()._delete_fts(con, doc_id)
+
+
 class ProjectorTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); root = Path(self.tmp.name)
@@ -79,7 +108,7 @@ class ProjectorTests(unittest.TestCase):
         self.assertEqual(check.execute("SELECT last_source_event_id FROM retrieval_projection_cursor WHERE singleton=1").fetchone()[0],before)
         self.assertIsNone(check.execute("SELECT record_id FROM retrieval_documents WHERE record_id='rec-v2'").fetchone())
         report=self.projector.run_once();self.assertEqual(report.inserted,1)
-        self.assertEqual(report.details["record_outcomes"],[{"record_id":"rec-v2","result":"projected","action":"inserted","projection_hash":check.execute("SELECT projection_hash FROM retrieval_documents WHERE record_id='rec-v2'").fetchone()[0]}])
+        self.assertEqual(report.details["record_outcomes"],[{"record_id":"rec-v2","result":"projected","action":"inserted","projection_hash":check.execute("SELECT projection_hash FROM retrieval_documents WHERE record_id='rec-v2'").fetchone()[0],"source_event_id":"2026-08-03T01:00:00+00:00\x1fevt-v2"}])
 
     def test_missing_record_event_blocks_cursor_and_cli_exits_nonzero(self):
         self._full(); con=sqlite3.connect(self.journal)
@@ -96,7 +125,7 @@ class ProjectorTests(unittest.TestCase):
         con.execute("UPDATE record_state SET status='forgotten',updated_event_id='evt-audit-skip' WHERE record_id='rec-001'")
         con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)",("evt-audit-skip","rec-001","record_forgotten","2026-08-03T03:00:00+00:00","fixture","{}"));con.commit();con.close()
         report=self.projector.run_once()
-        self.assertEqual(report.details["record_outcomes"],[{"record_id":"rec-001","result":"skipped","reason":"status_forgotten","action":"removed"}])
+        self.assertEqual(report.details["record_outcomes"],[{"record_id":"rec-001","result":"skipped","reason":"status_forgotten","action":"removed","source_event_id":"2026-08-03T03:00:00+00:00\x1fevt-audit-skip"}])
     def test_forget_removes_existing_document(self):
         self._full(); con=sqlite3.connect(self.journal); con.execute("UPDATE record_state SET status='forgotten',updated_event_id='evt-forget' WHERE record_id='rec-001'"); con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)", ("evt-forget","rec-001","record_forgotten","2026-08-04T00:00:00+00:00","fixture","{}")); con.commit()
         report=self.projector.run_once(); self.assertEqual(report.removed,1); self.assertEqual(self._counts(),(50,50))
@@ -193,5 +222,211 @@ class ProjectorTests(unittest.TestCase):
     def test_public_schema_snapshots_unchanged(self):
         from brain import schemas
         self.assertTrue(schemas.check_exported())
+
+    # --- Package 7: projector postcondition extensions ---------------------
+
+    def _cursor_value(self):
+        return sqlite3.connect(self.retrieval).execute("SELECT last_source_event_id FROM retrieval_projection_cursor WHERE singleton=1").fetchone()[0]
+
+    def _append_event(self, record_id, event_id, event_type, occurred_at):
+        con = sqlite3.connect(self.journal)
+        con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)", (event_id, record_id, event_type, occurred_at, "fixture", "{}"))
+        con.commit(); con.close()
+
+    def test_closed_skip_reasons_pin(self):
+        seen = set()
+        while (report := self.projector.run_once(100)).status == ProjectionStatus.HEALTHY:
+            seen |= {o["reason"] for o in report.details.get("record_outcomes", []) if o["result"] == "skipped"}
+        self.assertTrue(seen)
+        self.assertTrue(seen.issubset({"status_candidate", "status_rejected", "status_forgotten", "artifact_no_verified_active_relations", "not_eligible"}))
+
+    def test_source_event_id_present_for_every_outcome(self):
+        while (report := self.projector.run_once(100)).status == ProjectionStatus.HEALTHY:
+            for outcome in report.details.get("record_outcomes", []):
+                self.assertIn("source_event_id", outcome)
+                self.assertRegex(outcome["source_event_id"], r"^.+\x1fevt-")
+
+    def test_fts_row_matches_projected_document(self):
+        self._full(); con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+        doc = con.execute("SELECT doc_id,title,body,artifacts_text FROM retrieval_documents WHERE record_id='rec-004'").fetchone()
+        fts = con.execute("SELECT title,body,artifacts_text FROM retrieval_fts WHERE rowid=?", (doc["doc_id"],)).fetchone()
+        self.assertIsNotNone(fts)
+        self.assertEqual((fts["title"], fts["body"], fts["artifacts_text"]), (doc["title"], doc["body"], doc["artifacts_text"]))
+
+    def test_link_set_exactly_matches_desired(self):
+        self._full(); con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+        rows = con.execute("SELECT artifact_uri,relation FROM retrieval_document_links WHERE record_id='rec-004'").fetchall()
+        self.assertEqual({(r["artifact_uri"], r["relation"]) for r in rows}, {("repo://ai-pos/README.md", "touches")})
+
+    def test_mutation_deleted_fts_row_blocks_cursor_then_retry_advances_once(self):
+        self._full(); before = self._cursor_value()
+        self._append_event("rec-004", "evt-mut-fts", "record_approved", "2026-08-07T00:00:00+00:00")
+        def mutate(con, doc):
+            con.execute("DELETE FROM retrieval_fts WHERE rowid=(SELECT doc_id FROM retrieval_documents WHERE record_id=?)", (doc["record_id"],))
+        with self.assertRaisesRegex(Exception, "accepted_record_missing_fts_row"):
+            _MutateAfterUpsert(self.config, self.embedder, "rec-004", mutate).run_once()
+        self.assertEqual(self._cursor_value(), before)
+        report = self.projector.run_once()
+        self.assertEqual(report.status, ProjectionStatus.HEALTHY)
+        self.assertEqual(self._cursor_value(), "2026-08-07T00:00:00+00:00\x1fevt-mut-fts")
+        self.assertEqual(self.projector.run_once().status, ProjectionStatus.NO_CHANGES)
+
+    def test_mutation_deleted_embedding_row_blocks_cursor_then_retry_advances_once(self):
+        self._full(); before = self._cursor_value()
+        self._append_event("rec-004", "evt-mut-emb", "record_approved", "2026-08-07T00:01:00+00:00")
+        def mutate(con, doc):
+            con.execute("DELETE FROM retrieval_embeddings WHERE record_id=?", (doc["record_id"],))
+        with self.assertRaisesRegex(Exception, "accepted_record_missing_or_mismatched_embedding"):
+            _MutateAfterUpsert(self.config, self.embedder, "rec-004", mutate).run_once()
+        self.assertEqual(self._cursor_value(), before)
+        report = self.projector.run_once()
+        self.assertEqual(report.status, ProjectionStatus.HEALTHY)
+        self.assertEqual(self._cursor_value(), "2026-08-07T00:01:00+00:00\x1fevt-mut-emb")
+        self.assertEqual(self.projector.run_once().status, ProjectionStatus.NO_CHANGES)
+
+    def test_mutation_deleted_required_link_blocks_cursor_then_retry_advances_once(self):
+        self._full(); before = self._cursor_value()
+        self._append_event("rec-004", "evt-mut-link-del", "record_approved", "2026-08-07T00:02:00+00:00")
+        def mutate(con, doc):
+            con.execute("DELETE FROM retrieval_document_links WHERE record_id=?", (doc["record_id"],))
+        with self.assertRaisesRegex(Exception, "accepted_record_link_set_mismatch"):
+            _MutateAfterUpsert(self.config, self.embedder, "rec-004", mutate).run_once()
+        self.assertEqual(self._cursor_value(), before)
+        report = self.projector.run_once()
+        self.assertEqual(report.status, ProjectionStatus.HEALTHY)
+        self.assertEqual(self._cursor_value(), "2026-08-07T00:02:00+00:00\x1fevt-mut-link-del")
+        self.assertEqual(self.projector.run_once().status, ProjectionStatus.NO_CHANGES)
+
+    def test_mutation_stale_extra_link_blocks_cursor_then_retry_advances_once(self):
+        self._full(); before = self._cursor_value()
+        self._append_event("rec-004", "evt-mut-link-add", "record_approved", "2026-08-07T00:03:00+00:00")
+        def mutate(con, doc):
+            con.execute("INSERT OR REPLACE INTO retrieval_document_links VALUES (?,?,?,?,?,?)",
+                        (doc["record_id"], "artifact://stale-injection", "touches", 0.42, "test_injection", "2026-01-01T00:00:00+00:00"))
+        with self.assertRaisesRegex(Exception, "accepted_record_link_set_mismatch"):
+            _MutateAfterUpsert(self.config, self.embedder, "rec-004", mutate).run_once()
+        self.assertEqual(self._cursor_value(), before)
+        report = self.projector.run_once()
+        self.assertEqual(report.status, ProjectionStatus.HEALTHY)
+        self.assertEqual(self._cursor_value(), "2026-08-07T00:03:00+00:00\x1fevt-mut-link-add")
+        self.assertEqual(self.projector.run_once().status, ProjectionStatus.NO_CHANGES)
+        con = sqlite3.connect(self.retrieval)
+        self.assertIsNone(con.execute("SELECT 1 FROM retrieval_document_links WHERE artifact_uri='artifact://stale-injection'").fetchone())
+
+    def test_mutation_document_left_after_remove_blocks_cursor_then_retry_advances_once(self):
+        self._full(); before = self._cursor_value()
+        con = sqlite3.connect(self.journal)
+        con.execute("UPDATE record_state SET status='forgotten',updated_event_id='evt-mut-rm-doc' WHERE record_id='rec-001'")
+        con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)", ("evt-mut-rm-doc","rec-001","record_forgotten","2026-08-08T00:00:00+00:00","fixture","{}")); con.commit(); con.close()
+        with self.assertRaisesRegex(Exception, "removed_record_document_still_present"):
+            _SkipRemovalStep(self.config, self.embedder, "document").run_once()
+        self.assertEqual(self._cursor_value(), before)
+        self.assertIsNotNone(sqlite3.connect(self.retrieval).execute("SELECT record_id FROM retrieval_documents WHERE record_id='rec-001'").fetchone())
+        report = self.projector.run_once()
+        self.assertEqual(report.status, ProjectionStatus.HEALTHY)
+        self.assertEqual(self._cursor_value(), "2026-08-08T00:00:00+00:00\x1fevt-mut-rm-doc")
+        self.assertIsNone(sqlite3.connect(self.retrieval).execute("SELECT record_id FROM retrieval_documents WHERE record_id='rec-001'").fetchone())
+        self.assertEqual(self.projector.run_once().status, ProjectionStatus.NO_CHANGES)
+
+    def test_mutation_embedding_left_after_remove_via_fk_bypass_blocks_document_delete(self):
+        # retrieval_embeddings.record_id is a real FK (no ON DELETE CASCADE) to
+        # retrieval_documents, so skipping the embedding delete while still
+        # deleting the document is rejected by SQLite itself before
+        # _assert_removed even runs -- a stronger guarantee, exercised here as
+        # a full run_once() failure/rollback/retry cycle.
+        self._full(); before = self._cursor_value()
+        con = sqlite3.connect(self.journal)
+        con.execute("UPDATE record_state SET status='forgotten',updated_event_id='evt-mut-rm-emb' WHERE record_id='rec-001'")
+        con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)", ("evt-mut-rm-emb","rec-001","record_forgotten","2026-08-08T00:01:00+00:00","fixture","{}")); con.commit(); con.close()
+        with self.assertRaisesRegex(Exception, "FOREIGN KEY constraint failed"):
+            _SkipRemovalStep(self.config, self.embedder, "embedding").run_once()
+        self.assertEqual(self._cursor_value(), before)
+        self.assertIsNotNone(sqlite3.connect(self.retrieval).execute("SELECT record_id FROM retrieval_embeddings WHERE record_id='rec-001'").fetchone())
+        report = self.projector.run_once()
+        self.assertEqual(report.status, ProjectionStatus.HEALTHY)
+        self.assertEqual(self._cursor_value(), "2026-08-08T00:01:00+00:00\x1fevt-mut-rm-emb")
+        self.assertIsNone(sqlite3.connect(self.retrieval).execute("SELECT record_id FROM retrieval_embeddings WHERE record_id='rec-001'").fetchone())
+        self.assertEqual(self.projector.run_once().status, ProjectionStatus.NO_CHANGES)
+
+    def test_assert_removed_catches_leftover_embedding_row_bypassing_fk_backstop(self):
+        # Directly exercises _assert_removed's own embedding check (not merely
+        # trusting the FK-driven IntegrityError above) by constructing the
+        # corrupted state with FK enforcement off, as production DB corruption
+        # or a future schema relaxation could produce it.
+        self._full()
+        con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+        con.execute("PRAGMA foreign_keys=OFF")
+        doc_id = con.execute("SELECT doc_id FROM retrieval_documents WHERE record_id='rec-004'").fetchone()["doc_id"]
+        con.execute("DELETE FROM retrieval_fts WHERE rowid=?", (doc_id,))
+        con.execute("DELETE FROM retrieval_document_links WHERE record_id='rec-004'")
+        con.execute("DELETE FROM retrieval_documents WHERE record_id='rec-004'")
+        con.commit()
+        self.assertIsNotNone(con.execute("SELECT 1 FROM retrieval_embeddings WHERE record_id='rec-004'").fetchone())
+        with self.assertRaisesRegex(Exception, "removed_record_embedding_still_present"):
+            self.projector._assert_removed(con, "rec-004", doc_id)
+
+    def test_mutation_fts_row_left_after_remove_blocks_cursor_then_retry_advances_once(self):
+        self._full(); before = self._cursor_value()
+        con = sqlite3.connect(self.journal)
+        con.execute("UPDATE record_state SET status='forgotten',updated_event_id='evt-mut-rm-fts' WHERE record_id='rec-001'")
+        con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)", ("evt-mut-rm-fts","rec-001","record_forgotten","2026-08-08T00:02:00+00:00","fixture","{}")); con.commit(); con.close()
+        with self.assertRaisesRegex(Exception, "removed_record_fts_row_still_present"):
+            _SkipRemovalStep(self.config, self.embedder, "fts").run_once()
+        self.assertEqual(self._cursor_value(), before)
+        report = self.projector.run_once()
+        self.assertEqual(report.status, ProjectionStatus.HEALTHY)
+        self.assertEqual(self._cursor_value(), "2026-08-08T00:02:00+00:00\x1fevt-mut-rm-fts")
+        self.assertEqual(self.projector.run_once().status, ProjectionStatus.NO_CHANGES)
+
+    def test_assert_removed_catches_leftover_link_row_bypassing_fk_cascade(self):
+        # retrieval_document_links carries ON DELETE CASCADE from
+        # retrieval_documents, so a stray link row cannot survive a genuine
+        # document delete while FK enforcement is on -- the full run_once()
+        # transactional path cannot produce this corruption by construction.
+        # This directly exercises _assert_removed's own guard (rather than
+        # solely trusting the cascade) by constructing the state with FK
+        # enforcement off, matching how out-of-band DB corruption could occur.
+        self._full()
+        con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+        con.execute("PRAGMA foreign_keys=OFF")
+        doc_id = con.execute("SELECT doc_id FROM retrieval_documents WHERE record_id='rec-004'").fetchone()["doc_id"]
+        con.execute("DELETE FROM retrieval_embeddings WHERE record_id='rec-004'")
+        con.execute("DELETE FROM retrieval_fts WHERE rowid=?", (doc_id,))
+        con.execute("DELETE FROM retrieval_documents WHERE record_id='rec-004'")
+        con.commit()
+        self.assertIsNotNone(con.execute("SELECT 1 FROM retrieval_document_links WHERE record_id='rec-004'").fetchone())
+        with self.assertRaisesRegex(Exception, "removed_record_links_still_present"):
+            self.projector._assert_removed(con, "rec-004", doc_id)
+
+    def test_deterministic_full_rebuild_with_live_written_records(self):
+        self._full()
+        con = sqlite3.connect(self.journal)
+        payload = json.dumps({"subject": "live", "predicate": "has", "object": "package7 rebuild coverage", "evidence": "fixture"})
+        con.execute("INSERT INTO memory_records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    ("rec-p7-live", 1, "fact", "ai-pos", "normal", payload, payload, "hash-p7", "idempotency-p7", "fixture", "imported_curated", None, None, None, 1.0, "2026-08-09T00:00:00+00:00", "2026-08-09T00:00:00+00:00"))
+        con.execute("INSERT INTO record_state VALUES (?,?,?,?,?,?,?,?,?,?,?)", ("rec-p7-live", "accepted", "human_approved", None, None, None, None, "none", None, None, "evt-p7-live"))
+        con.execute("INSERT INTO memory_events VALUES (?,?,?,?,?,?)", ("evt-p7-live", "rec-p7-live", "record_created", "2026-08-09T00:00:00+00:00", "fixture", "{}"))
+        con.commit(); con.close()
+        self._full()
+        journal_before = sha256(self.journal)
+
+        def snapshot():
+            con = sqlite3.connect(self.retrieval); con.row_factory = sqlite3.Row
+            hashes = {r["record_id"]: r["projection_hash"] for r in con.execute("SELECT record_id,projection_hash FROM retrieval_documents")}
+            doc_rows = {(r["record_id"], r["projection_hash"], r["workspace"], r["type"], r["status"], r["is_current"]) for r in con.execute("SELECT record_id,projection_hash,workspace,type,status,is_current FROM retrieval_documents")}
+            emb_rows = {(r["record_id"], r["projection_hash"], r["model_fingerprint"], r["dimensions"]) for r in con.execute("SELECT record_id,projection_hash,model_fingerprint,dimensions FROM retrieval_embeddings")}
+            fts_rows = {(r["title"], r["body"], r["artifacts_text"]) for r in con.execute("SELECT title,body,artifacts_text FROM retrieval_fts")}
+            link_rows = {(r["record_id"], r["artifact_uri"], r["relation"], r["confidence"], r["origin"], r["verified_at"]) for r in con.execute("SELECT record_id,artifact_uri,relation,confidence,origin,verified_at FROM retrieval_document_links")}
+            return hashes, doc_rows, emb_rows, fts_rows, link_rows
+
+        before = snapshot()
+        self.assertIn("rec-p7-live", before[0])
+        self.retrieval.unlink()
+        rebuilt = ProjectionProjector(self.config, self.embedder)
+        while rebuilt.run_once(100).status == ProjectionStatus.HEALTHY: pass
+        self.assertEqual(rebuilt.run_once().status, ProjectionStatus.NO_CHANGES)
+        after = snapshot()
+        self.assertEqual(before, after)
+        self.assertEqual(sha256(self.journal), journal_before)
 
 if __name__ == "__main__": unittest.main()
