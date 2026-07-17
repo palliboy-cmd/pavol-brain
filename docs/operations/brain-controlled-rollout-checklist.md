@@ -16,9 +16,9 @@ Operator checklist for deploying `write-safety-integrity-repair-spec.md` Package
 
 ## Migration
 
-- [ ] Personal marker backfill dry-run (`scripts/stamp_brain_instance.py --instance-id personal`, no `--apply`) reports `blocked: null`
+- [ ] Personal marker backfill dry-run (`"$PY" scripts/stamp_brain_instance.py --journal-db "$PERSONAL_JOURNAL" --instance-id personal`, no `--apply`) reports `blocked: null`
 - [ ] Personal marker backfill apply (`--apply`) reports `stamped: true`
-- [ ] WORK marker backfill dry-run (`scripts/stamp_brain_instance.py --instance-id work`, no `--apply`) reports `blocked: null`
+- [ ] WORK marker backfill dry-run (`"$PY" scripts/stamp_brain_instance.py --journal-db "$WORK_JOURNAL" --instance-id work`, no `--apply`) reports `blocked: null`
 - [ ] WORK marker backfill apply (`--apply`) reports `stamped: true`
 - [ ] Marker SQL verification — `SELECT * FROM brain_instance_identity` on both journals: exactly one row each, `instance_id` matches the journal's own directory
 - [ ] Canonical content digest unchanged — the backfill script's own logical-digest check passed (built into apply; re-confirm via the row counts in the runbook's Step 7)
@@ -26,7 +26,7 @@ Operator checklist for deploying `write-safety-integrity-repair-spec.md` Package
 
 ## Retrieval
 
-- [ ] Retrieval instance marker verified for both retrieval DBs (`run_brain_projector.py --instance-id <id> --validate`, read-only)
+- [ ] Retrieval instance marker verified for both retrieval DBs (`"$PY" scripts/run_brain_projector.py --journal-db "$PERSONAL_JOURNAL" --retrieval-db "$PERSONAL_RETRIEVAL_DB" --instance-id personal --validate` and the WORK equivalent with `--journal-db "$WORK_JOURNAL" --retrieval-db "$WORK_RETRIEVAL_DB" --instance-id work`; read-only; placeholders per the runbook's environment block)
 - [ ] Rebuild triggered for any retrieval DB reporting a missing/incompatible marker (delete + let the next projector run rebuild and re-stamp from empty)
 - [ ] Projector plan/status healthy for both instances (`run_brain_projector.py --plan`, no `REBUILD_REQUIRED`/`FAILED`)
 - [ ] Cursor consistent — plan output's cursor state matches the journal head for each instance (no unexpected backlog)
